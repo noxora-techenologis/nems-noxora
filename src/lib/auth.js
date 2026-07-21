@@ -58,25 +58,30 @@ export const ROLE_MODULES = {
   owner:    ['dashboard', 'owners', 'reports'],
 };
 
+// Normalize role string or Arabic role title into valid role key
+export function normalizeRoleKey(role) {
+  if (!role) return 'employee';
+  const r = String(role).toLowerCase();
+  if (r.includes('admin') || r.includes('تقني') || r.includes('مدير النظام')) return 'admin';
+  if (r.includes('ceo') || r.includes('المدير العام') || r.includes('مدير عام')) return 'ceo';
+  if (r.includes('fm') || r.includes('مالية') || r.includes('المالية')) return 'fm';
+  if (r.includes('hr') || r.includes('موارد') || r.includes('الموارد البشرية')) return 'hr';
+  if (r.includes('pm') || r.includes('مشاريع') || r.includes('مدير المشاريع')) return 'pm';
+  if (r.includes('owner') || r.includes('مالك') || r.includes('ملاك') || r.includes('أسهم')) return 'owner';
+  return 'employee';
+}
+
 export function hasAccess(role, module, session) {
   if (session && session.sidebar_modules) {
     return session.sidebar_modules.includes(module);
   }
-  const roleKey = typeof role === 'string' ? role.toLowerCase() : '';
+  const roleKey = normalizeRoleKey(role);
   const modules = ROLE_MODULES[roleKey] || [];
   return modules.includes(module);
 }
 
-export function getDashboardPath(role) {
-  const roleKey = role?.toLowerCase();
-  const paths = {
-    admin: '/dashboard/admin',
-    ceo: '/dashboard/ceo',
-    fm: '/dashboard/fm',
-    hr: '/dashboard/hr',
-    pm: '/dashboard/pm',
-    employee: '/dashboard/employee',
-    owner: '/dashboard/owner',
-  };
-  return paths[roleKey] || '/dashboard';
+export function getDashboardPath(role, dashboardType) {
+  const target = dashboardType || role;
+  const roleKey = normalizeRoleKey(target);
+  return `/dashboard/${roleKey}`;
 }

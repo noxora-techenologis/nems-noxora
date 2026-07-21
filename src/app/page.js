@@ -9,7 +9,7 @@ export default function Home() {
 
   useEffect(() => {
     const session = getSession();
-    const target = session ? getDashboardPath(session.role_name) : '/login';
+    const target = session ? getDashboardPath(session.role_name, session.dashboard_type) : '/login';
     // Use window.location for WebView compatibility (router.replace can fail in some WebViews)
     if (typeof window !== 'undefined') {
       window.location.href = target;

@@ -141,7 +141,7 @@ export default function DashboardLayout({ children }) {
 
   const roleKey = (session.role_name || '').toLowerCase();
   const roleColor = ROLE_COLORS[roleKey] || 'var(--noxora-red)';
-  const dashboardPath = getDashboardPath(session.role_name);
+  const dashboardPath = getDashboardPath(session.role_name, session.dashboard_type);
   const modules = session.sidebar_modules || [];
 
   return (
