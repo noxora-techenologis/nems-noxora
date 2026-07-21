@@ -1,0 +1,475 @@
+{
+  "roles": [
+    {
+      "role_id": 1,
+      "role_name": "Admin",
+      "description": "مدير النظام - صلاحيات تقنية كاملة",
+      "dashboard_type": "admin",
+      "sidebar_modules": [
+        "dashboard",
+        "users",
+        "settings",
+        "logs"
+      ]
+    },
+    {
+      "role_id": 2,
+      "role_name": "CEO",
+      "description": "المدير العام - صلاحيات إدارية كاملة",
+      "dashboard_type": "ceo",
+      "sidebar_modules": [
+        "dashboard",
+        "employees",
+        "attendance",
+        "projects",
+        "clients",
+        "finance",
+        "owners",
+        "meetings",
+        "documents",
+        "messages",
+        "reports",
+        "settings"
+      ]
+    },
+    {
+      "role_id": 3,
+      "role_name": "FM",
+      "description": "المدير المالي - إدارة الحسابات والرواتب",
+      "dashboard_type": "fm",
+      "sidebar_modules": [
+        "dashboard",
+        "finance",
+        "clients",
+        "employees",
+        "reports",
+        "meetings"
+      ]
+    },
+    {
+      "role_id": 4,
+      "role_name": "HR",
+      "description": "مدير الموارد البشرية - الموظفون والدوام",
+      "dashboard_type": "hr",
+      "sidebar_modules": [
+        "dashboard",
+        "employees",
+        "attendance",
+        "meetings",
+        "reports"
+      ]
+    },
+    {
+      "role_id": 5,
+      "role_name": "PM",
+      "description": "مدير المشروع - إدارة المشاريع والمهام",
+      "dashboard_type": "pm",
+      "sidebar_modules": [
+        "dashboard",
+        "projects",
+        "clients",
+        "meetings",
+        "documents"
+      ]
+    },
+    {
+      "role_id": 6,
+      "role_name": "Employee",
+      "description": "موظف - الدوام والمهام الشخصية",
+      "dashboard_type": "employee",
+      "sidebar_modules": [
+        "dashboard",
+        "attendance",
+        "projects",
+        "meetings",
+        "documents",
+        "messages"
+      ]
+    },
+    {
+      "role_id": 7,
+      "role_name": "Owner",
+      "description": "مالك وشريك - الأسهم والتصويت والأرباح",
+      "dashboard_type": "owner",
+      "sidebar_modules": [
+        "dashboard",
+        "owners",
+        "reports"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "user_id": 1,
+      "name": "مدير النظام التقني",
+      "email": "admin@noxora.com",
+      "password_hash": "admin123",
+      "phone": "0500000001",
+      "role_id": 1,
+      "status": "active",
+      "avatar": "",
+      "created_at": "2026-01-01 08:00:00",
+      "last_login": "2026-07-21 17:01:55",
+      "updated_at": "2026-07-21 17:01:55"
+    }
+  ],
+  "departments": [
+    {
+      "department_id": 1,
+      "name": "الإدارة العليا",
+      "name_en": "Management",
+      "manager_id": null,
+      "parent_department_id": null,
+      "created_at": "2026-01-01 08:00:00"
+    }
+  ],
+  "employees": [],
+  "projects": [],
+  "tasks": [],
+  "attendance": [],
+  "attendance_logs": [],
+  "leaves": [],
+  "salaries": [],
+  "deduction_proposals": [],
+  "clients": [],
+  "revenues": [],
+  "expenses": [],
+  "budgets": [],
+  "owners": [],
+  "position_requests": [],
+  "shares": [],
+  "share_transactions": [],
+  "profit_distributions": [],
+  "votes": [],
+  "vote_options": [],
+  "user_votes": [],
+  "meetings": [],
+  "meeting_attendees": [],
+  "conversations": [],
+  "conversation_members": [],
+  "messages": [],
+  "files": [],
+  "project_documents": [],
+  "file_versions": [],
+  "announcements": [],
+  "notifications": [],
+  "system_settings": [
+    {
+      "setting_id": 1,
+      "key": "company_name",
+      "value": "شركة نوكسورا للتقنية",
+      "type": "string",
+      "category": "company",
+      "label_ar": "اسم الشركة الرسمي",
+      "label_en": "Company Name",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 2,
+      "key": "primary_color",
+      "value": "#C0392B",
+      "type": "string",
+      "category": "appearance",
+      "label_ar": "اللون الأساسي للشركة (أحمر)",
+      "label_en": "Primary Color (Red)",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 3,
+      "key": "secondary_color",
+      "value": "#F39C12",
+      "type": "string",
+      "category": "appearance",
+      "label_ar": "اللون الثانوي للشركة (أصفر)",
+      "label_en": "Secondary Color (Yellow)",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 4,
+      "key": "company_initial_assets_valuation",
+      "value": "1000000",
+      "type": "number",
+      "category": "company",
+      "label_ar": "التقييم الأولي لممتلكات وأصول الشركة (أوقية / MRU)",
+      "label_en": "Company Assets Valuation",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 5,
+      "key": "company_total_shares",
+      "value": "1000",
+      "type": "number",
+      "category": "company",
+      "label_ar": "إجمالي أسهم الشركة التأسيسية القابلة للتوزيع",
+      "label_en": "Total Company Base Shares",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 6,
+      "key": "shares_setup_completed",
+      "value": "false",
+      "type": "boolean",
+      "category": "company",
+      "label_ar": "تم قفل تخصيص الأسهم التأسيسية الأولية",
+      "label_en": "Initial Shares Setup Completed",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 7,
+      "key": "work_start_time",
+      "value": "08:00",
+      "type": "string",
+      "category": "attendance",
+      "label_ar": "وقت بدء الدوام الرسمي",
+      "label_en": "Official Work Start Time",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 8,
+      "key": "work_end_time",
+      "value": "17:00",
+      "type": "string",
+      "category": "attendance",
+      "label_ar": "وقت نهاية الدوام الرسمي",
+      "label_en": "Official Work End Time",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 9,
+      "key": "hourly_checkins_required",
+      "value": "8",
+      "type": "number",
+      "category": "attendance",
+      "label_ar": "عدد البصمات الساعية المطلوبة يومياً",
+      "label_en": "Hourly Check-ins Required Daily",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    },
+    {
+      "setting_id": 10,
+      "key": "late_tolerance_minutes",
+      "value": "15",
+      "type": "number",
+      "category": "attendance",
+      "label_ar": "فترة السماح للتأخر (دقائق)",
+      "label_en": "Late Tolerance Period (Minutes)",
+      "updated_by": 1,
+      "updated_at": "2026-07-21 12:00:00"
+    }
+  ],
+  "feedback_reports": [],
+  "audit_log": [
+    {
+      "log_id": 1,
+      "user_id": 1,
+      "user_name": "System Admin",
+      "action": "system_cleaned",
+      "module": "System",
+      "entity_type": "database",
+      "entity_id": "NEMS_PROD_DB",
+      "old_value": null,
+      "new_value": {
+        "status": "production_ready"
+      },
+      "ip_address": "127.0.0.1",
+      "device": "💻 server-init",
+      "timestamp": "2026-07-21 12:00:00"
+    },
+    {
+      "log_id": 2,
+      "user_id": 1,
+      "user_name": "مدير النظام التقني",
+      "action": "update",
+      "module": "Users",
+      "entity_type": "users",
+      "entity_id": "1",
+      "old_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00"
+      },
+      "new_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:35:31",
+        "updated_at": "2026-07-21 16:35:31"
+      },
+      "ip_address": "127.0.0.1",
+      "device": "💻 Server API",
+      "timestamp": "2026-07-21 16:35:31"
+    },
+    {
+      "log_id": 3,
+      "user_id": 1,
+      "user_name": "مدير النظام التقني",
+      "action": "update",
+      "module": "Users",
+      "entity_type": "users",
+      "entity_id": "1",
+      "old_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:35:31",
+        "updated_at": "2026-07-21 16:35:31"
+      },
+      "new_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:40:54",
+        "updated_at": "2026-07-21 16:40:54"
+      },
+      "ip_address": "127.0.0.1",
+      "device": "💻 Server API",
+      "timestamp": "2026-07-21 16:40:54"
+    },
+    {
+      "log_id": 4,
+      "user_id": 1,
+      "user_name": "مدير النظام التقني",
+      "action": "update",
+      "module": "Users",
+      "entity_type": "users",
+      "entity_id": "1",
+      "old_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:40:54",
+        "updated_at": "2026-07-21 16:40:54"
+      },
+      "new_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:42:59",
+        "updated_at": "2026-07-21 16:42:59"
+      },
+      "ip_address": "127.0.0.1",
+      "device": "💻 Server API",
+      "timestamp": "2026-07-21 16:42:59"
+    },
+    {
+      "log_id": 5,
+      "user_id": 1,
+      "user_name": "مدير النظام التقني",
+      "action": "update",
+      "module": "Users",
+      "entity_type": "users",
+      "entity_id": "1",
+      "old_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:42:59",
+        "updated_at": "2026-07-21 16:42:59"
+      },
+      "new_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:47:06",
+        "updated_at": "2026-07-21 16:47:06"
+      },
+      "ip_address": "127.0.0.1",
+      "device": "💻 Server API",
+      "timestamp": "2026-07-21 16:47:06"
+    },
+    {
+      "log_id": 6,
+      "user_id": 1,
+      "user_name": "مدير النظام التقني",
+      "action": "update",
+      "module": "Users",
+      "entity_type": "users",
+      "entity_id": "1",
+      "old_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 16:47:06",
+        "updated_at": "2026-07-21 16:47:06"
+      },
+      "new_value": {
+        "user_id": 1,
+        "name": "مدير النظام التقني",
+        "email": "admin@noxora.com",
+        "password_hash": "admin123",
+        "phone": "0500000001",
+        "role_id": 1,
+        "status": "active",
+        "avatar": "",
+        "created_at": "2026-01-01 08:00:00",
+        "last_login": "2026-07-21 17:01:55",
+        "updated_at": "2026-07-21 17:01:55"
+      },
+      "ip_address": "127.0.0.1",
+      "device": "💻 Server API",
+      "timestamp": "2026-07-21 17:01:55"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "appId": "com.noxora.nems",
+  "appName": "Noxora NEMS",
+  "webDir": ".next",
+  "server": {
+    "androidScheme": "https"
+  }
+}

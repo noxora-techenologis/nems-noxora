@@ -1,0 +1,23 @@
+R_DEF: Internal format may change without notice
+local
+color bg_dark
+color black
+color noxora_red
+color noxora_red_dark
+color noxora_yellow
+color white
+drawable logo
+id btnRetry
+id layoutError
+id layoutLoading
+id logoImage
+id progressBar
+id swipeRefresh
+id webView
+layout activity_main
+mipmap ic_launcher
+string app_name
+string loading
+string no_internet
+string retry
+style Theme.NEMS
