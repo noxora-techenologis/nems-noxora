@@ -9,8 +9,13 @@ const tajawal = Tajawal({
 });
 
 export const metadata = {
-  title: "NEMS - Noxora Enterprise Management System",
-  description: "نظام إدارة الموارد والأعمال الشامل لشركة نوكسورا تكنولوجيز",
+  title: 'NEMS - نظام إدارة نوكسورا تكنولوجيز',
+  description: 'نظام إدارة موارد المؤسسات المتقدم لشركة نوكسورا تكنولوجيز',
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
   keywords: "NEMS, Noxora, Enterprise, Management, نوكسورا",
   authors: [{ name: "Noxora Technologies" }],
 };

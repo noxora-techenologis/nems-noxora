@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        webView.loadUrl("http://192.168.100.110:3000")
+        webView.loadUrl("https://nems-noxora.vercel.app")
     }
 
     override fun onResume() {
