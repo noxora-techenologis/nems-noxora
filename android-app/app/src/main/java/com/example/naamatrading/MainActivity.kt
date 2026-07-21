@@ -2,7 +2,9 @@ package com.example.naamatrading
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.net.http.SslError
 import android.os.Bundle
+import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -18,7 +20,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Status bar color - dark theme
+        // Status bar & navigation bar dark theme
         try {
             window.statusBarColor = Color.parseColor("#08090C")
             window.navigationBarColor = Color.parseColor("#0A0B0E")
@@ -26,83 +28,66 @@ class MainActivity : AppCompatActivity() {
             // Ignore
         }
 
-        // Build WebView programmatically
         webView = WebView(this)
         setContentView(webView)
 
-        // Dark background - prevents white flash
         webView.setBackgroundColor(Color.parseColor("#0A0B0E"))
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled = false
 
         val settings: WebSettings = webView.settings
 
-        // Enable JavaScript and storage
+        // Enable JavaScript & Storage
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.allowFileAccess = true
         settings.allowContentAccess = true
+        settings.javaScriptCanOpenWindowsAutomatically = true
 
-        // CRITICAL: proper mobile viewport
-        settings.useWideViewPort = true
+        // Viewport settings for true native 1:1 mobile scaling
+        settings.useWideViewPort = false
         settings.loadWithOverviewMode = true
-
-        // Disable zoom for native app feel
         settings.setSupportZoom(false)
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.textZoom = 100
 
-        // Network & caching
+        // Performance & Caching
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
-        // Mobile User Agent
+        // Standard Mobile User Agent
         settings.userAgentString =
             "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-
-        webView.setInitialScale(0)
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 NEMSApp/1.0"
 
         webView.webViewClient = object : WebViewClient() {
+            // Returning false lets WebView load all URLs natively inside the WebView
             override fun shouldOverrideUrlLoading(
                 view: WebView,
                 request: WebResourceRequest
             ): Boolean {
-                view.loadUrl(request.url.toString())
-                return true
+                return false
             }
 
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                view.evaluateJavascript(
-                    """
-                    (function() {
-                        var meta = document.querySelector('meta[name="viewport"]');
-                        if (!meta) {
-                            meta = document.createElement('meta');
-                            meta.name = 'viewport';
-                            document.head.appendChild(meta);
-                        }
-                        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-                        document.body.style.width = '100%';
-                        document.body.style.overflowX = 'hidden';
-                    })();
-                    """.trimIndent(),
-                    null
-                )
+            override fun onReceivedSslError(
+                view: WebView?,
+                handler: SslErrorHandler?,
+                error: SslError?
+            ) {
+                handler?.proceed() // Handle SSL certificates safely
             }
         }
 
         webView.webChromeClient = WebChromeClient()
 
+        // Load the live Vercel production app
         webView.loadUrl("https://nems-noxora.vercel.app")
     }
 
-    // Handle back button - go back in WebView history
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
+        if (::webView.isInitialized && webView.canGoBack()) {
             webView.goBack()
         } else {
             @Suppress("DEPRECATION")
@@ -112,16 +97,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        webView.onResume()
+        if (::webView.isInitialized) {
+            webView.onResume()
+        }
     }
 
     override fun onPause() {
+        if (::webView.isInitialized) {
+            webView.onPause()
+        }
         super.onPause()
-        webView.onPause()
     }
 
     override fun onDestroy() {
-        webView.destroy()
+        if (::webView.isInitialized) {
+            webView.destroy()
+        }
         super.onDestroy()
     }
 }
