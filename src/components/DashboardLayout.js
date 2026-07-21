@@ -244,7 +244,7 @@ export default function DashboardLayout({ children }) {
               title="تغيير عملة العرض"
               style={{ fontWeight: 800 }}
             >
-              💱 {curr === 'MRU' ? 'أوقية (MRU)' : 'دولار ($)'}
+              💱 {curr === 'MRU' ? 'MRU' : '$'}<span className="currency-full-label">{curr === 'MRU' ? ' (أوقية)' : ' (دولار)'}</span>
             </button>
 
             {/* Notifications Dropdown */}
