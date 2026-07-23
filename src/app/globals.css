@@ -104,6 +104,12 @@ body {
   min-height: 100vh;
 }
 
+/* Messages chat layout */
+.messages-chat-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
 /* ===== Sidebar (Glass & Blur) ===== */
 .sidebar {
   width: var(--sidebar-width);
@@ -1103,19 +1109,27 @@ tbody td {
 
 /* ===== Responsive (Mobile & Tablet) ===== */
 @media (max-width: 1024px) {
-  /* === Root Layout Adjustments === */
+  /* === Root Layout: Fixed viewport container === */
   html, body {
-    overflow-x: hidden !important;
+    overflow: hidden !important;
     width: 100% !important;
     max-width: 100% !important;
-    position: relative !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
   }
 
   .app-layout {
-    overflow-x: hidden !important;
+    overflow: hidden !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-height: 100vh;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
   }
 
   /* === Sidebar: Hidden via display:none when closed === */
@@ -1146,7 +1160,7 @@ tbody td {
   }
   .sidebar-overlay.active { display: block !important; }
 
-  /* === Main Content === */
+  /* === Main Content: Scrollable viewport fill === */
   .main-content {
     margin-right: 0 !important;
     margin-left: 0 !important;
@@ -1154,6 +1168,12 @@ tbody td {
     max-width: 100% !important;
     min-width: 0 !important;
     overflow-x: hidden !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   /* === Topbar === */
@@ -1195,11 +1215,12 @@ tbody td {
   /* === Page Content & Headers === */
   .page-content {
     padding: 14px !important;
+    padding-bottom: 80px !important;
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
-    padding-bottom: 76px !important;
+    min-height: 100% !important;
   }
   .page-title {
     font-size: 18px !important;
@@ -1398,6 +1419,24 @@ tbody td {
     box-sizing: border-box !important;
   }
 
+  /* === Force ALL inline grid layouts to single column on mobile === */
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns: 2fr 1fr"],
+  [style*="grid-template-columns: 3fr 1fr"],
+  [style*="grid-template-columns: 1fr 2fr"],
+  [style*="grid-template-columns: 1fr 300px"],
+  [style*="grid-template-columns: 150px 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* === Fixed-width search inputs === */
+  [style*="width: 250px"],
+  [style*="width: 220px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   /* === Mobile Navigation Bar Bottom === */
   .mobile-bottom-nav {
     display: flex !important;
@@ -1463,6 +1502,15 @@ tbody td {
     bottom: 130px !important;
     max-height: 62vh !important;
   }
+
+  /* === Messages Chat: Stack sidebar on mobile === */
+  .messages-chat-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
+  }
+  .messages-chat-layout > div:first-child {
+    display: none !important;
+  }
 }
 
 /* ===== Mobile Bottom Navigation Bar ===== */
@@ -1521,7 +1569,39 @@ tbody td {
 
   /* Padding offset so content doesn't get covered by bottom nav */
   .page-content {
-    padding-bottom: 76px !important;
+    padding-bottom: 80px !important;
+  }
+
+  /* === Fix ALL inline grid styles that bypass CSS class overrides === */
+  .page-content [style*="grid-template-columns"]:not([style*="grid-template-columns: 1fr"]):not([style*="grid-template-columns: repeat"]) {
+    grid-template-columns: 1fr !important;
+  }
+  .page-content [style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* === MessagesModule: Stack sidebar on mobile === */
+  .page-content [style*="280px 1fr"] {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr !important;
+  }
+
+  /* === SettingsModule: Stack 300px column === */
+  .page-content [style*="1fr 300px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* === Fixed-width search inputs === */
+  .page-content [style*="width: 250px"],
+  .page-content [style*="width: 220px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* === Tables in cards: allow horizontal scroll === */
+  .card table {
+    display: table !important;
+    width: 100% !important;
   }
 }
 

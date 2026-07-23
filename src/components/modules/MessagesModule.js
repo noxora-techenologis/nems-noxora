@@ -103,7 +103,7 @@ export default function MessagesModule({ session }) {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 0, height: '72vh', display: 'grid', gridTemplateColumns: '280px 1fr', overflow: 'hidden' }}>
+      <div className="card messages-chat-layout" style={{ padding: 0, height: '72vh', overflow: 'hidden' }}>
         {/* Sidebar: list of chats */}
         <div style={{ borderLeft: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', background: 'rgba(16, 18, 26, 0.4)' }}>
           <div style={{ padding: '20px', fontWeight: 800, borderBottom: '1px solid var(--border-primary)', fontSize: '14.5px', color: 'var(--text-primary)' }}>💬 غرف التواصل المتاحة</div>
