@@ -9,7 +9,7 @@ export async function GET(request) {
     const notifications = await getTable('notifications');
     const userNotifs = userId
       ? notifications.filter(n => n.user_id === userId)
-      : notifications;
+      : [];
 
     // Sort by date descending
     userNotifs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));

@@ -194,7 +194,7 @@ export default function ReportsModule({ session }) {
                 {salaries.map(sal => (
                   <tr key={sal.salary_id}>
                     <td style={{ fontWeight: 700 }}>{sal.employee_id}</td>
-                    <td>{formatCurrency(sal.basic_salary)}</td>
+                    <td>{formatCurrency(sal.base_salary)}</td>
                     <td style={{ color: 'var(--success)' }}>+{formatCurrency(sal.allowances)}</td>
                     <td style={{ color: 'var(--danger)' }}>-{formatCurrency(sal.deductions)}</td>
                     <td style={{ fontWeight: 800 }}>{formatCurrency(sal.net_salary)}</td>

@@ -44,7 +44,7 @@ export default function SettingsModule({ session }) {
       const result = await res.json();
       if (result.success) {
         const updatedSession = { ...session, name: profileName, phone: profilePhone, email: profileEmail, avatar: profileAvatar };
-        localStorage.setItem('nems-session', JSON.stringify(updatedSession));
+        localStorage.setItem('nems_session', JSON.stringify(updatedSession));
         window.dispatchEvent(new Event('profile-change'));
         alert('تم تحديث ملفك الشخصي بنجاح!');
       } else {
@@ -213,8 +213,8 @@ export default function SettingsModule({ session }) {
                           id={`setting-input-${s.setting_id}`}
                           type="text"
                           className="form-input"
-                          value={s.value}
-                          onChange={e => handleUpdateSetting(s.setting_id, e.target.value)}
+                          defaultValue={s.value}
+                          onBlur={e => { if (e.target.value !== s.value) handleUpdateSetting(s.setting_id, e.target.value); }}
                         />
                       )}
                     </div>

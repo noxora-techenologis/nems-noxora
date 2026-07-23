@@ -70,7 +70,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       if (result.success) {
         if (isSelf) {
           const updatedSession = { ...currentUser, name, phone, email, avatar };
-          localStorage.setItem('nems-session', JSON.stringify(updatedSession));
+          localStorage.setItem('nems_session', JSON.stringify(updatedSession));
           window.dispatchEvent(new Event('profile-change'));
         }
         alert('تم تحديث بيانات الملف الشخصي بنجاح!');
@@ -391,7 +391,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={pwdSaving || (newPassword !== confirmPassword && confirmPassword)}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={pwdSaving || !newPassword || !confirmPassword || newPassword !== confirmPassword}>
                   {pwdSaving ? '⏳ جاري التغيير...' : '🔐 تغيير كلمة المرور'}
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('info')}>إلغاء</button>

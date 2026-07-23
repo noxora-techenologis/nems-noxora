@@ -98,9 +98,9 @@ export default function EmployeesModule({ session }) {
   };
 
   const filtered = employees.filter(emp =>
-    emp.job_title.toLowerCase().includes(search.toLowerCase()) ||
-    emp.employee_id.toLowerCase().includes(search.toLowerCase()) ||
-    emp.nationality.toLowerCase().includes(search.toLowerCase())
+    (emp.job_title || '').toLowerCase().includes(search.toLowerCase()) ||
+    (emp.employee_id || '').toLowerCase().includes(search.toLowerCase()) ||
+    (emp.nationality || '').toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) {
@@ -200,7 +200,7 @@ export default function EmployeesModule({ session }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                     <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '18px' }}>
-                      {selectedEmp.job_title[0]}
+                      {selectedEmp.job_title?.[0] || 'N'}
                     </div>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '16px' }}>{selectedEmp.job_title}</div>

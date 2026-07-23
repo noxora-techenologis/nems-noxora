@@ -25,10 +25,10 @@ export default function LogsModule() {
   };
 
   const filtered = logs.filter(log =>
-    log.user_name.toLowerCase().includes(search.toLowerCase()) ||
-    log.action.toLowerCase().includes(search.toLowerCase()) ||
-    log.module.toLowerCase().includes(search.toLowerCase()) ||
-    log.entity_type.toLowerCase().includes(search.toLowerCase())
+    (log.user_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (log.action || '').toLowerCase().includes(search.toLowerCase()) ||
+    (log.module || '').toLowerCase().includes(search.toLowerCase()) ||
+    (log.entity_type || '').toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) {

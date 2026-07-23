@@ -73,6 +73,26 @@ const pgConfig = {
   ssl: process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('localhost') ? { rejectUnauthorized: false } : false
 };
 
+// Allowed table names for SQL injection protection
+const SAFE_TABLES = new Set([
+  'users', 'roles', 'employees', 'departments', 'projects', 'tasks',
+  'attendance', 'attendance_logs', 'leaves', 'salaries', 'deduction_proposals',
+  'clients', 'revenues', 'expenses', 'budgets', 'owners', 'shares',
+  'share_transactions', 'profit_distributions', 'votes', 'vote_options',
+  'user_votes', 'meetings', 'meeting_attendees', 'conversations',
+  'conversation_members', 'messages', 'files', 'project_documents',
+  'file_versions', 'announcements', 'notifications', 'feedback_reports',
+  'audit_log', 'system_settings', 'position_requests', 'permissions',
+  'role_permissions'
+]);
+
+function validateTableName(table) {
+  if (!SAFE_TABLES.has(table)) {
+    throw new Error(`Access denied to table: "${table}"`);
+  }
+  return table;
+}
+
 let pool = null;
 let usePostgres = false;
 
@@ -80,6 +100,9 @@ let usePostgres = false;
 if (process.env.DATABASE_URL || process.env.PGHOST) {
   try {
     pool = new Pool(pgConfig);
+    pool.on('error', (err) => {
+      console.error('NEMS Database: Pool error (idle client).', err.message);
+    });
     usePostgres = true;
     console.log('NEMS Database: Connected to PostgreSQL database.');
   } catch (err) {
@@ -130,6 +153,7 @@ export async function query(text, params = []) {
 
 // Specific CRUD API for Next.js API Routes (acting as an ORM layer)
 export async function getTable(table) {
+  validateTableName(table);
   if (usePostgres) {
     const res = await pool.query(`SELECT * FROM ${table}`);
     return res.rows;
@@ -140,6 +164,7 @@ export async function getTable(table) {
 }
 
 export async function saveTable(table, data) {
+  validateTableName(table);
   if (usePostgres) {
     // PostgreSQL transactions: truncate and bulk re-insert for state syncing
     const client = await pool.connect();

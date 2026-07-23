@@ -388,7 +388,7 @@ export default function ClientsModule({ session }) {
                   </thead>
                   <tbody>
                     {clients.map(c => (
-                      <tr key={c.client_id} id={`client-row-${c.client_id}`} style={{ cursor: 'pointer' }} onClick={() => handleSelectProject(c)}>
+                      <tr key={c.client_id} id={`client-row-${c.client_id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedClient(c)}>
                         <td>
                           <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.name}</div>
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.company}</div>

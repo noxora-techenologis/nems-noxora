@@ -227,8 +227,8 @@ export default function FinanceModule({ session }) {
   // Format using NEMS unified formatter (enforces Ghubariya numerals and USD/MRU currency)
   const formatCurrency = (n, curr = 'MRU') => formatCurrencyImport(n, curr);
 
-  const totalRev = revenues.reduce((s, r) => s + r.amount, 0);
-  const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalRev = revenues.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const totalExp = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const netIncome = totalRev - totalExp;
 
   return (
@@ -263,18 +263,18 @@ export default function FinanceModule({ session }) {
           <div className="stats-grid">
             <div className="stat-card green">
               <div className="stat-icon green">📈</div>
-              <div className="stat-value">{formatCurrency(totalRev)}</div>
+              <div className="stat-value">{formatCurrency(totalRev, 'SAR')}</div>
               <div className="stat-label">إجمالي المقبوضات</div>
             </div>
             <div className="stat-card">
               <div className="stat-icon red">📉</div>
-              <div className="stat-value">{formatCurrency(totalExp)}</div>
+              <div className="stat-value">{formatCurrency(totalExp, 'SAR')}</div>
               <div className="stat-label">إجمالي المدفوعات</div>
             </div>
             <div className="stat-card">
               <div className="stat-icon green">🏆</div>
               <div className="stat-value" style={{ color: netIncome >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                {formatCurrency(netIncome)}
+                {formatCurrency(netIncome, 'SAR')}
               </div>
               <div className="stat-label">صافي رصيد الخزينة</div>
             </div>

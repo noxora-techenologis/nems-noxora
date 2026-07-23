@@ -68,13 +68,12 @@ export default function DashboardLayout({ children }) {
     setSession(sess);
 
     // Fetch user notifications
-    fetch('/api/notifications')
+    fetch(`/api/notifications?userId=${sess.user_id}`)
       .then(res => res.json())
       .then(data => {
-        if (data.data) {
-          const userNotifs = data.data.filter(n => n.user_id === sess.user_id || n.user_id === null);
-          setNotifications(userNotifs);
-          setUnreadCount(userNotifs.filter(n => !n.is_read).length);
+        if (data.notifications) {
+          setNotifications(data.notifications);
+          setUnreadCount(data.notifications.filter(n => !n.is_read).length);
         }
       })
       .catch(() => {});
@@ -117,7 +116,7 @@ export default function DashboardLayout({ children }) {
     setAiLoading(true);
 
     try {
-      const res = await fetch('/api/notifications', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: textToSend, session }),
@@ -180,7 +179,7 @@ export default function DashboardLayout({ children }) {
             const item = NAV_ITEMS[modKey];
             if (!item) return null;
             const fullPath = modKey === 'dashboard' ? dashboardPath : `${dashboardPath}/${modKey}`;
-            const isActive = pathname === fullPath;
+            const isActive = modKey === 'dashboard' ? pathname === fullPath : pathname.startsWith(fullPath);
 
             return (
               <Link
@@ -271,8 +270,8 @@ export default function DashboardLayout({ children }) {
                         لا يوجد إشعارات حالياً
                       </div>
                     ) : (
-                      notifications.map(n => (
-                        <div key={n.notification_id || Math.random()} className={`notif-item ${!n.is_read ? 'unread' : ''}`}>
+                      notifications.map((n, idx) => (
+                        <div key={n.notification_id || `notif-${idx}`} className={`notif-item ${!n.is_read ? 'unread' : ''}`}>
                           <div className="notif-title">{n.title}</div>
                           <div className="notif-msg">{n.message}</div>
                           <div className="notif-time">{n.created_at || 'الآن'}</div>

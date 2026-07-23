@@ -1542,6 +1542,59 @@ tbody td {
     padding: 3px 8px !important;
     font-size: 11px !important;
   }
+
+  /* === Enhanced Touch Targets (44px minimum for WCAG) === */
+  .btn {
+    min-height: 44px !important;
+  }
+  .btn-sm {
+    min-height: 36px !important;
+  }
+  .form-input, .form-select, .form-textarea {
+    min-height: 44px !important;
+  }
+  .sidebar-item, .nav-item {
+    min-height: 44px !important;
+  }
+  .bottom-nav-item {
+    min-height: 48px !important;
+  }
+
+  /* === Mobile Profile Modal Fixes === */
+  .card[style*="max-width: 580px"] {
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* === Improved Modal on Small Screens === */
+  .modal-overlay, [style*="backdrop-filter: blur(10px)"] {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  /* === Tables: Better Horizontal Scroll === */
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+  }
+
+  /* === Tab Buttons Wrap on Mobile === */
+  [style*="display: flex"][style*="gap: 8px"][style*="border-bottom"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* === Page Subtitle Readability === */
+  .page-subtitle {
+    line-height: 1.5 !important;
+  }
+
+  /* === Stat Cards: Prevent Text Overflow === */
+  .stat-value {
+    font-size: 16px !important;
+    word-break: break-word !important;
+  }
 }
 
 /* ===== Noxora AI Animations ===== */

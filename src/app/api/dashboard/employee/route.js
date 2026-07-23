@@ -6,11 +6,13 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employeeId');
 
-    if (!employeeId) {
+    const employeeIdNum = Number(employeeId);
+
+    if (!employeeId || isNaN(employeeIdNum)) {
       return NextResponse.json({ error: 'employeeId required' }, { status: 400 });
     }
 
-    const [attendance, attendance_logs, tasks, leaves, salaries, deductions, notifications, announcements] = await Promise.all([
+    const [attendance, attendance_logs, tasks, leaves, salaries, deductions, notifications, announcements, employees] = await Promise.all([
       getTable('attendance'),
       getTable('attendance_logs'),
       getTable('tasks'),
@@ -19,12 +21,16 @@ export async function GET(request) {
       getTable('deduction_proposals'),
       getTable('notifications'),
       getTable('announcements'),
+      getTable('employees'),
     ]);
 
     const today = new Date().toISOString().split('T')[0];
 
+    const employee = employees.find(e => e.employee_id === employeeIdNum || String(e.employee_id) === String(employeeId));
+    const employeeUserId = employee?.user_id;
+
     // Today attendance
-    const todayAttendance = attendance.find(a => a.employee_id === employeeId && a.date === today);
+    const todayAttendance = attendance.find(a => a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId));
 
     // Today hourly logs
     const todayLogs = todayAttendance
@@ -45,10 +51,10 @@ export async function GET(request) {
 
     // This month attendance summary
     const currentMonth = today.substring(0, 7);
-    const monthAttendance = attendance.filter(a => a.employee_id === employeeId && a.date?.startsWith(currentMonth));
+    const monthAttendance = attendance.filter(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && a.date?.startsWith(currentMonth));
 
     // Tasks
-    const myTasks = tasks.filter(t => t.assigned_to === employeeId);
+    const myTasks = tasks.filter(t => t.assigned_to === employeeIdNum || String(t.assigned_to) === String(employeeId));
     const taskStats = {
       total: myTasks.length,
       completed: myTasks.filter(t => t.status === 'completed').length,
@@ -57,16 +63,18 @@ export async function GET(request) {
     };
 
     // Salary
-    const latestSalary = salaries.filter(s => s.employee_id === employeeId).sort((a, b) => b.month.localeCompare(a.month))[0];
+    const latestSalary = salaries.filter(s => s.employee_id === employeeIdNum || String(s.employee_id) === String(employeeId)).sort((a, b) => b.month.localeCompare(a.month))[0];
 
     // Pending deductions
-    const pendingDeductions = deductions.filter(d => d.employee_id === employeeId && d.status === 'draft');
+    const pendingDeductions = deductions.filter(d => (d.employee_id === employeeIdNum || String(d.employee_id) === String(employeeId)) && d.status === 'draft');
 
     // Pending leaves
-    const pendingLeaves = leaves.filter(l => l.employee_id === employeeId && l.status === 'pending');
+    const pendingLeaves = leaves.filter(l => (l.employee_id === employeeIdNum || String(l.employee_id) === String(employeeId)) && l.status === 'pending');
 
-    // Notifications
-    const myNotifs = notifications.filter(n => n.user_id && n.is_read === false);
+    // Notifications - only for this employee's user_id
+    const myNotifs = employeeUserId
+      ? notifications.filter(n => n.user_id === employeeUserId && n.is_read === false)
+      : [];
 
     return NextResponse.json({
       todayAttendance,

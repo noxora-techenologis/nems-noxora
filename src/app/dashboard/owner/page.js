@@ -55,7 +55,7 @@ export default function OwnerDashboard() {
   const activeVotes = votes.filter(v => v.status === 'active');
 
   // Share colors for owners
-  const COLORS = ['#C0392B', '#F39C12', '#3498DB'];
+  const COLORS = ['#C0392B', '#F39C12', '#3498DB', '#8B5CF6', '#27AE60', '#E67E22', '#1ABC9C', '#9B59B6'];
 
   return (
     <DashboardLayout>
@@ -100,19 +100,19 @@ export default function OwnerDashboard() {
             {shares.map((sh, i) => {
               const owner = owners.find(o => o.owner_id === sh.owner_id);
               return (
-                <div key={sh.share_id} style={{ padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: `1px solid ${COLORS[i]}33` }}>
+                <div key={sh.share_id} style={{ padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: `1px solid ${COLORS[i % COLORS.length]}33` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '14px' }}>{owner?.name || `مالك ${sh.owner_id}`}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatNumber(sh.total_shares)} سهم</div>
                     </div>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '24px', fontWeight: 800, color: COLORS[i] }}>{sh.ownership_percentage}%</div>
+                      <div style={{ fontSize: '24px', fontWeight: 800, color: COLORS[i % COLORS.length] }}>{sh.ownership_percentage}%</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة: {formatCurrency(sh.total_shares * sh.current_value)}</div>
                     </div>
                   </div>
                   <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${sh.ownership_percentage}%`, background: COLORS[i] }} />
+                    <div className="progress-fill" style={{ width: `${sh.ownership_percentage}%`, background: COLORS[i % COLORS.length] }} />
                   </div>
                 </div>
               );
