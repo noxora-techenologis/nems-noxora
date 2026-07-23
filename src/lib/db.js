@@ -85,6 +85,16 @@ function now() {
   return new Date().toISOString().replace('T', ' ').substring(0, 19);
 }
 
+function serializeValue(v) {
+  if (v === null || v === undefined) return v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
+
+function serializeValues(obj) {
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, serializeValue(v)]));
+}
+
 // ─── Core Query ───
 export async function query(text, params = []) {
   if (!usePostgres) throw new Error('DATABASE_URL not configured');
@@ -106,8 +116,9 @@ export async function insertRecord(table, record, userId = 1) {
   if (!usePostgres) throw new Error('DATABASE_URL not configured');
 
   record.created_at = now();
-  const keys = Object.keys(record);
-  const values = Object.values(record);
+  const safe = serializeValues(record);
+  const keys = Object.keys(safe);
+  const values = Object.values(safe);
   const cols = keys.map(k => `"${k}"`).join(', ');
   const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -130,8 +141,9 @@ export async function updateRecord(table, idValue, updatedFields, userId = 1) {
   const idKey = pk(table);
   updatedFields.updated_at = now();
 
-  const keys = Object.keys(updatedFields);
-  const values = Object.values(updatedFields);
+  const safe = serializeValues(updatedFields);
+  const keys = Object.keys(safe);
+  const values = Object.values(safe);
   const setClause = keys.map((k, i) => `"${k}" = $${i + 1}`).join(', ');
 
   const res = await pool.query(
