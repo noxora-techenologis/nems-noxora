@@ -194,124 +194,94 @@ export async function saveTable(table, data) {
 }
 
 export async function insertRecord(table, record, userId = 1) {
-  const data = await getTable(table);
-  let newId = 1;
-  const idKey = getPrimaryKeyField(table);
-
-  if (data.length > 0) {
-    const ids = data.map(item => {
-      const val = item[idKey];
-      if (typeof val === 'number') return val;
-      if (typeof val === 'string') {
-        const match = val.match(/\d+/);
-        return match ? parseInt(match[0], 10) : 0;
-      }
-      return 0;
-    });
-    newId = Math.max(...ids) + 1;
-  }
-
-  if (idKey) {
-    if (typeof data[0]?.[idKey] === 'string') {
-      const prefix = data[0][idKey].split('-')[0] || 'REC';
-      record[idKey] = `${prefix}-${String(newId).padStart(3, '0')}`;
-    } else {
-      record[idKey] = newId;
-    }
-  }
+  validateTableName(table);
+  requirePostgres(`insertRecord(${table})`);
 
   record.created_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  data.push(record);
-  await saveTable(table, data);
 
-  // Log to audit log
-  await auditLog(
-    userId,
-    'create',
-    getModuleForTable(table),
-    table,
-    record[idKey] || 'N/A',
-    null,
-    record
+  const keys = Object.keys(record);
+  const values = Object.values(record);
+  const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+
+  const res = await pool.query(
+    `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+    values
   );
+  const inserted = res.rows[0];
 
-  return record;
+  // Log to audit log (fire and forget)
+  auditLog(userId, 'create', getModuleForTable(table), table, inserted[getPrimaryKeyField(table)] || 'N/A', null, inserted).catch(() => {});
+
+  return inserted;
 }
 
 export async function updateRecord(table, idValue, updatedFields, userId = 1) {
-  const data = await getTable(table);
+  validateTableName(table);
+  requirePostgres(`updateRecord(${table})`);
+
   const idKey = getPrimaryKeyField(table);
-  const index = data.findIndex(item => item[idKey] === idValue);
+  updatedFields.updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-  if (index === -1) return false;
+  const keys = Object.keys(updatedFields);
+  const values = Object.values(updatedFields);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
 
-  const oldRecord = JSON.parse(JSON.stringify(data[index]));
-  const newRecord = { ...data[index], ...updatedFields, updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19) };
-
-  data[index] = newRecord;
-  await saveTable(table, data);
-
-  // Log to audit log
-  await auditLog(
-    userId,
-    'update',
-    getModuleForTable(table),
-    table,
-    idValue,
-    oldRecord,
-    newRecord
+  const res = await pool.query(
+    `UPDATE ${table} SET ${setClause} WHERE ${idKey} = $${keys.length + 1} RETURNING *`,
+    [...values, idValue]
   );
+
+  if (res.rowCount === 0) return false;
+
+  const newRecord = res.rows[0];
+  auditLog(userId, 'update', getModuleForTable(table), table, idValue, null, newRecord).catch(() => {});
 
   return newRecord;
 }
 
 export async function deleteRecord(table, idValue, userId = 1) {
-  const data = await getTable(table);
+  validateTableName(table);
+  requirePostgres(`deleteRecord(${table})`);
+
   const idKey = getPrimaryKeyField(table);
-  const index = data.findIndex(item => item[idKey] === idValue);
-
-  if (index === -1) return false;
-
-  const oldRecord = data[index];
-  data.splice(index, 1);
-  await saveTable(table, data);
-
-  // Log to audit log
-  await auditLog(
-    userId,
-    'delete',
-    getModuleForTable(table),
-    table,
-    idValue,
-    oldRecord,
-    null
+  const res = await pool.query(
+    `DELETE FROM ${table} WHERE ${idKey} = $1 RETURNING *`,
+    [idValue]
   );
+
+  if (res.rowCount === 0) return false;
+
+  auditLog(userId, 'delete', getModuleForTable(table), table, idValue, res.rows[0], null).catch(() => {});
 
   return true;
 }
 
 export async function auditLog(userId, action, module, entityType, entityId, oldValue, newValue) {
-  const auditData = await getTable('audit_log');
-  const users = await getTable('users');
-  const user = users.find(u => u.user_id === userId) || { name: 'زائر / نظام' };
+  try {
+    requirePostgres('auditLog');
+    const users = await getTable('users');
+    const user = users.find(u => u.user_id === userId) || { name: 'زائر / نظام' };
 
-  const newLog = {
-    log_id: auditData.length > 0 ? Math.max(...auditData.map(l => l.log_id)) + 1 : 1,
-    user_id: userId,
-    user_name: user.name,
-    action: action,
-    module: module,
-    entity_type: entityType,
-    entity_id: String(entityId),
-    old_value: oldValue,
-    new_value: newValue,
-    ip_address: '127.0.0.1',
-    device: '💻 Server API',
-    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19)
-  };
-
-  auditData.push(newLog);
-  await saveTable('audit_log', auditData);
+    await pool.query(
+      `INSERT INTO audit_log (user_id, user_name, action, module, entity_type, entity_id, old_value, new_value, ip_address, device, timestamp)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        userId,
+        user.name,
+        action,
+        module,
+        entityType,
+        String(entityId),
+        oldValue ? JSON.stringify(oldValue) : null,
+        newValue ? JSON.stringify(newValue) : null,
+        '127.0.0.1',
+        '💻 Server API',
+        new Date().toISOString().replace('T', ' ').substring(0, 19)
+      ]
+    );
+  } catch {
+    // Audit log should not break the main operation
+  }
 }
 
 function getPrimaryKeyField(table) {
