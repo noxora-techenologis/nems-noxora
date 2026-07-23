@@ -1,10 +1,7 @@
 package com.example.naamatrading
 
 import android.annotation.SuppressLint
-import android.graphics.Color
-import android.net.http.SslError
 import android.os.Bundle
-import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -14,55 +11,40 @@ import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
+    private var webView: WebView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Status bar & navigation bar dark theme
-        try {
-            window.statusBarColor = Color.parseColor("#08090C")
-            window.navigationBarColor = Color.parseColor("#0A0B0E")
-        } catch (e: Exception) {
-            // Ignore
-        }
+        val wv = WebView(this)
+        webView = wv
+        setContentView(wv)
 
-        webView = WebView(this)
-        setContentView(webView)
-
-        webView.setBackgroundColor(Color.parseColor("#0A0B0E"))
-        webView.isHorizontalScrollBarEnabled = false
-        webView.isVerticalScrollBarEnabled = false
-
-        val settings: WebSettings = webView.settings
-
-        // Enable JavaScript & Storage
+        val settings: WebSettings = wv.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.allowFileAccess = true
-        settings.allowContentAccess = true
-        settings.javaScriptCanOpenWindowsAutomatically = true
 
-        // Viewport settings for true native 1:1 mobile scaling
-        settings.useWideViewPort = false
-        settings.loadWithOverviewMode = true
+        // KEY: useWideViewPort=true tells WebView to honor the page's
+        // <meta name="viewport" content="width=device-width"> tag.
+        // loadWithOverviewMode=false means don't zoom out to fit — show 1:1
+        settings.useWideViewPort = true
+        settings.loadWithOverviewMode = false
+
         settings.setSupportZoom(false)
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.textZoom = 100
 
-        // Performance & Caching
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
+        settings.cacheMode = WebSettings.LOAD_NO_CACHE
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
-        // Standard Mobile User Agent
         settings.userAgentString =
             "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36 NEMSApp/1.0"
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
-        webView.webViewClient = object : WebViewClient() {
-            // Returning false lets WebView load all URLs natively inside the WebView
+        wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView,
                 request: WebResourceRequest
@@ -70,25 +52,35 @@ class MainActivity : AppCompatActivity() {
                 return false
             }
 
-            override fun onReceivedSslError(
-                view: WebView?,
-                handler: SslErrorHandler?,
-                error: SslError?
-            ) {
-                handler?.proceed() // Handle SSL certificates safely
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                // Enforce correct mobile viewport after page loads
+                view.evaluateJavascript("""
+                    (function() {
+                        var meta = document.querySelector('meta[name="viewport"]');
+                        if (!meta) {
+                            meta = document.createElement('meta');
+                            meta.name = 'viewport';
+                            document.head.appendChild(meta);
+                        }
+                        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+                        document.documentElement.style.overflowX = 'hidden';
+                        document.body.style.overflowX = 'hidden';
+                        document.body.style.width = '100%';
+                    })();
+                """.trimIndent(), null)
             }
         }
 
-        webView.webChromeClient = WebChromeClient()
-
-        // Load the live Vercel production app
-        webView.loadUrl("https://nems-noxora.vercel.app")
+        wv.webChromeClient = WebChromeClient()
+        wv.loadUrl("https://nems-noxora.vercel.app")
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
+        val wv = webView
+        if (wv != null && wv.canGoBack()) {
+            wv.goBack()
         } else {
             @Suppress("DEPRECATION")
             super.onBackPressed()
@@ -97,22 +89,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::webView.isInitialized) {
-            webView.onResume()
-        }
+        webView?.onResume()
     }
 
     override fun onPause() {
-        if (::webView.isInitialized) {
-            webView.onPause()
-        }
+        webView?.onPause()
         super.onPause()
     }
 
     override fun onDestroy() {
-        if (::webView.isInitialized) {
-            webView.destroy()
-        }
+        webView?.destroy()
+        webView = null
         super.onDestroy()
     }
 }

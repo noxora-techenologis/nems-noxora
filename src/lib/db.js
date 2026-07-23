@@ -111,18 +111,22 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
   }
 }
 
-// JSON file database paths
+// JSON file database paths (local development only)
 const JSON_DB_DIR = path.join(process.cwd(), 'src', 'data');
 const JSON_DB_FILE = path.join(JSON_DB_DIR, 'db.json');
 
 // Initialize local JSON database directory and file if it does not exist
 function initJsonDatabase() {
-  if (!fs.existsSync(JSON_DB_DIR)) {
-    fs.mkdirSync(JSON_DB_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(JSON_DB_FILE)) {
-    fs.writeFileSync(JSON_DB_FILE, JSON.stringify(INITIAL_SEED, null, 2), 'utf-8');
-    console.log('NEMS Database: Initialized local JSON database file.');
+  try {
+    if (!fs.existsSync(JSON_DB_DIR)) {
+      fs.mkdirSync(JSON_DB_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(JSON_DB_FILE)) {
+      fs.writeFileSync(JSON_DB_FILE, JSON.stringify(INITIAL_SEED, null, 2), 'utf-8');
+      console.log('NEMS Database: Initialized local JSON database file.');
+    }
+  } catch (err) {
+    console.error('NEMS Database: Cannot initialize JSON file (read-only filesystem). PostgreSQL required.', err.message);
   }
 }
 
@@ -130,25 +134,24 @@ if (!usePostgres) {
   initJsonDatabase();
 }
 
+function requirePostgres(operation) {
+  if (!usePostgres) {
+    throw new Error(
+      `EROFS: ${operation} failed — Vercel filesystem is read-only. ` +
+      `Set DATABASE_URL environment variable to connect to PostgreSQL.`
+    );
+  }
+}
+
 // Helper to query the active database engine
 export async function query(text, params = []) {
   if (usePostgres) {
     const res = await pool.query(text, params);
     return res.rows;
-  } else {
-    // Read from local JSON database
-    const dbData = JSON.parse(fs.readFileSync(JSON_DB_FILE, 'utf-8'));
-    
-    // Simple custom simulation for query methods:
-    // Support queries like: "SELECT * FROM users"
-    const cleanedText = text.trim().toLowerCase().replace(/\s+/g, ' ');
-    if (cleanedText.startsWith('select * from')) {
-      const tableName = cleanedText.split('from')[1].trim().split(' ')[0];
-      return dbData[tableName] || [];
-    }
-    
-    return [];
   }
+  throw new Error(
+    `No database configured. Set DATABASE_URL to connect to PostgreSQL.`
+  );
 }
 
 // Specific CRUD API for Next.js API Routes (acting as an ORM layer)
@@ -157,40 +160,35 @@ export async function getTable(table) {
   if (usePostgres) {
     const res = await pool.query(`SELECT * FROM ${table}`);
     return res.rows;
-  } else {
-    const dbData = JSON.parse(fs.readFileSync(JSON_DB_FILE, 'utf-8'));
-    return dbData[table] || [];
   }
+  throw new Error(
+    `No database configured. Set DATABASE_URL to connect to PostgreSQL.`
+  );
 }
 
 export async function saveTable(table, data) {
   validateTableName(table);
-  if (usePostgres) {
-    // PostgreSQL transactions: truncate and bulk re-insert for state syncing
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(`TRUNCATE TABLE ${table} CASCADE`);
-      for (const row of data) {
-        const keys = Object.keys(row);
-        const values = Object.values(row);
-        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-        await client.query(
-          `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
-          values
-        );
-      }
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
+  requirePostgres(`saveTable(${table})`);
+  // PostgreSQL transactions: truncate and bulk re-insert for state syncing
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`TRUNCATE TABLE ${table} CASCADE`);
+    for (const row of data) {
+      const keys = Object.keys(row);
+      const values = Object.values(row);
+      const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+        values
+      );
     }
-  } else {
-    const dbData = JSON.parse(fs.readFileSync(JSON_DB_FILE, 'utf-8'));
-    dbData[table] = data;
-    fs.writeFileSync(JSON_DB_FILE, JSON.stringify(dbData, null, 2), 'utf-8');
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
   return true;
 }
