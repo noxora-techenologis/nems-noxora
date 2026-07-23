@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { SESSION_KEY } from '@/lib/auth';
 
 export default function SettingsModule({ session }) {
   const [settings, setSettings] = useState([]);
@@ -44,7 +45,7 @@ export default function SettingsModule({ session }) {
       const result = await res.json();
       if (result.success) {
         const updatedSession = { ...session, name: profileName, phone: profilePhone, email: profileEmail, avatar: profileAvatar };
-        localStorage.setItem('nems_session', JSON.stringify(updatedSession));
+        localStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
         window.dispatchEvent(new Event('profile-change'));
         alert('تم تحديث ملفك الشخصي بنجاح!');
       } else {

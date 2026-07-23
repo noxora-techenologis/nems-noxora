@@ -91,6 +91,7 @@ export async function GET(request) {
       latestSalary,
       pendingDeductions,
       pendingLeaves,
+      notifications: myNotifs,
       announcements: announcements.filter(a => !a.expires_at || new Date(a.expires_at) > new Date()),
     });
   } catch (err) {

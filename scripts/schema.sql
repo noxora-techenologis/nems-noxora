@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS departments (
   department_id SERIAL PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
   name_en VARCHAR(150),
-  manager_id INT REFERENCES employees(employee_id),
+  manager_id INT,
   parent_department_id INT,
   created_at TIMESTAMP DEFAULT NOW()
 );

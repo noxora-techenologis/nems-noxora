@@ -1,36 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getTable, insertRecord, updateRecord, deleteRecord } from '@/lib/db';
-
-// Allowed tables (security whitelist)
-const ALLOWED_TABLES = [
-  'users', 'roles', 'employees', 'departments', 'projects', 'tasks',
-  'attendance', 'attendance_logs', 'leaves', 'salaries', 'deduction_proposals',
-  'clients', 'revenues', 'expenses', 'budgets', 'owners', 'shares',
-  'share_transactions', 'profit_distributions', 'votes', 'vote_options',
-  'user_votes', 'meetings', 'meeting_attendees', 'conversations',
-  'conversation_members', 'messages', 'files', 'project_documents',
-  'file_versions', 'announcements', 'notifications', 'feedback_reports',
-  'audit_log', 'system_settings'
-];
+import { getTable, insertRecord, updateRecord, deleteRecord, SAFE_TABLES } from '@/lib/db';
 
 export async function GET(request, { params }) {
   try {
     const { table } = await params;
 
-    if (!ALLOWED_TABLES.includes(table)) {
+    if (!SAFE_TABLES.has(table)) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح بالوصول إليه.` }, { status: 403 });
     }
 
-    const { searchParams } = new URL(request.url);
     const data = await getTable(table);
 
-    // Optional filtering by a single field
+    const { searchParams } = new URL(request.url);
     const filterField = searchParams.get('field');
     const filterValue = searchParams.get('value');
 
     let result = data;
     if (filterField && filterValue !== null) {
-      result = data.filter(row => String(row[filterField]) === filterValue);
+      const safeFields = new Set(Object.keys(data[0] || {}));
+      if (safeFields.has(filterField)) {
+        result = data.filter(row => String(row[filterField]) === filterValue);
+      }
     }
 
     return NextResponse.json({ data: result, total: result.length });
@@ -43,7 +33,7 @@ export async function POST(request, { params }) {
   try {
     const { table } = await params;
 
-    if (!ALLOWED_TABLES.includes(table)) {
+    if (!SAFE_TABLES.has(table)) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح به.` }, { status: 403 });
     }
 
@@ -61,7 +51,7 @@ export async function PUT(request, { params }) {
   try {
     const { table } = await params;
 
-    if (!ALLOWED_TABLES.includes(table)) {
+    if (!SAFE_TABLES.has(table)) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح به.` }, { status: 403 });
     }
 
@@ -87,7 +77,7 @@ export async function DELETE(request, { params }) {
   try {
     const { table } = await params;
 
-    if (!ALLOWED_TABLES.includes(table)) {
+    if (!SAFE_TABLES.has(table)) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح به.` }, { status: 403 });
     }
 

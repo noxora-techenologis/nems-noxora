@@ -44,7 +44,7 @@ export default function DynamicModulePage() {
     }
 
     // Verify if the user has access to this module
-    if (!hasAccess(role, module)) {
+    if (!hasAccess(role, module, sess)) {
       setAuthorized(false);
       setLoading(false);
       return;

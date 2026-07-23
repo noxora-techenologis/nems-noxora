@@ -37,7 +37,7 @@ export async function POST(request) {
       updated_at: now
     }, user_id || 1);
 
-    await auditLog(user_id || 1, 'attendance', 'checkout', todayRecord.attendance_id, {
+    await auditLog(user_id || 1, 'checkout', 'Attendance', 'attendance', todayRecord.attendance_id, null, {
       check_out: now,
       total_hours: totalHours,
       overtime_hours: overtimeHours

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { formatCurrency } from '@/lib/format';
+import { SESSION_KEY } from '@/lib/auth';
 
 export default function UserProfileModal({ user, currentUser, onClose, onUpdate }) {
   const isSelf = currentUser && (currentUser.user_id === user?.user_id || currentUser.user_id === user?.id);
@@ -70,7 +71,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       if (result.success) {
         if (isSelf) {
           const updatedSession = { ...currentUser, name, phone, email, avatar };
-          localStorage.setItem('nems_session', JSON.stringify(updatedSession));
+          localStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
           window.dispatchEvent(new Event('profile-change'));
         }
         alert('تم تحديث بيانات الملف الشخصي بنجاح!');
