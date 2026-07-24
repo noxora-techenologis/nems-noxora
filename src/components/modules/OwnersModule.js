@@ -14,6 +14,8 @@ export default function OwnersModule({ session }) {
   const [userVotes, setUserVotes] = useState([]);
   const [shareTransactions, setShareTransactions] = useState([]);
   const [positionRequests, setPositionRequests] = useState([]);
+  const [activeRoles, setActiveRoles] = useState(['OWNER']);
+  const [allPositions, setAllPositions] = useState([]);
   const [valuation, setValuation] = useState(null);
   const [profitInfo, setProfitInfo] = useState(null);
   const [distributions, setDistributions] = useState([]);
@@ -66,7 +68,7 @@ export default function OwnersModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes, profRes, distRes, wdRes] = await Promise.all([
+      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes, profRes, distRes, wdRes, roleRes] = await Promise.all([
         fetch('/api/data/owners'),
         fetch('/api/data/shares'),
         fetch('/api/data/votes'),
@@ -78,6 +80,7 @@ export default function OwnersModule({ session }) {
         fetch('/api/valuation'),
         fetch('/api/data/profit_distributions'),
         fetch(`/api/withdrawals?ownerId=${session.owner_id || ''}&role=${session.role_name || ''}`),
+        fetch(`/api/owner-roles?ownerId=${session.owner_id || ''}`),
       ]);
       const ownData = await ownRes.json();
       const shrData = await shrRes.json();
@@ -90,6 +93,7 @@ export default function OwnersModule({ session }) {
       const profData = await profRes.json();
       const distData = await distRes.json();
       const wdData = await wdRes.json();
+      const roleData = await roleRes.json();
 
       setOwners(ownData.data || []);
       setShares(shrData.data || []);
@@ -101,6 +105,8 @@ export default function OwnersModule({ session }) {
       setDistributions(distData.data || []);
       setWithdrawals(wdData.data || []);
       setProfitInfo(profData || null);
+      setActiveRoles(roleData.active_roles || ['OWNER']);
+      setAllPositions(roleData.positions || []);
       const val = (valData.data || [])[0] || null;
       setValuation(val);
       if (val) {
@@ -412,16 +418,14 @@ export default function OwnersModule({ session }) {
     }
 
     try {
-      const res = await fetch('/api/data/position_requests', {
+      const res = await fetch('/api/owner-roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           owner_id: currentOwner.owner_id,
-          user_id: session.user_id,
-          requested_role_name: reqRole,
+          position_code: reqRole,
           reason: reqReason,
-          status: 'pending',
-          _userId: session.user_id,
+          user_id: session.user_id,
         })
       });
       const result = await res.json();
@@ -474,35 +478,47 @@ export default function OwnersModule({ session }) {
 
   const handleApprovePositionRequest = async (reqId, approved, ownerId, roleName) => {
     try {
-      // 1. Update position_requests status
-      const res = await fetch('/api/data/position_requests', {
+      const res = await fetch('/api/owner-roles', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          _id: reqId,
-          _userId: session.user_id,
-          status: approved ? 'approved' : 'rejected',
-          approved_by: session.user_id,
-          approved_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+          request_id: reqId,
+          action: approved ? 'approve' : 'reject',
+          role: session.role_name,
+          user_id: session.user_id,
+          owner_id: ownerId,
+          position_code: roleName,
         })
       });
       const result = await res.json();
       if (result.success) {
-        if (approved) {
-          // 2. Update secondary_role_name in owners table
-          await fetch('/api/data/owners', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              _id: ownerId,
-              _userId: session.user_id,
-              secondary_role_name: roleName
-            })
-          });
-          alert(`✅ تم اعتماد المنصب (${roleName}) للمالك بنجاح! ستُدمج الصلاحيات تلقائياً عند تسجيل دخوله القادم.`);
-        } else {
-          alert('❌ تم رفض طلب المنصب الوظيفي.');
-        }
+        alert(result.message || (approved ? 'تم اعتماد المنصب بنجاح!' : 'تم رفض الطلب.'));
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت العملية');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
+
+  const handleDemotePosition = async (positionCode) => {
+    const pos = allPositions.find(p => p.code === positionCode);
+    if (!confirm(`هل أنت متأكد من التنازل عن منصب "${pos?.name || positionCode}"؟\nست失去 جميع الصلاحيات المرتبطة بهذا المنصب.`)) return;
+
+    try {
+      const res = await fetch('/api/owner-roles', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'demote',
+          owner_id: session.owner_id,
+          position_code: positionCode,
+        })
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert(result.message || 'تم التنازل عن المنصب بنجاح.');
         fetchData();
       } else {
         alert(result.error || 'فشلت العملية');
@@ -834,176 +850,156 @@ export default function OwnersModule({ session }) {
       )}
 
       {activeTab === 'positions' && isOwner && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-          
-          {/* Requests & Approved Positions List */}
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">💼 المناصب الوظيفية والاعتمادات للملاك</h2>
-            </div>
-            
-            {/* Owner's Current Role Badge */}
-            {(() => {
-              const myOwnerObj = owners.find(o => o.user_id === session.user_id);
-              return (
-                <div style={{
-                  padding: '16px', marginBottom: '20px', background: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)', border: '1px solid var(--border-accent)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                }}>
-                  <div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>صفة ملكيتك في الشركة</div>
-                    <div style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)', marginTop: '2px' }}>
-                      🏛️ مالك وشريك {myOwnerObj?.secondary_role_name ? `+ 💼 ${myOwnerObj.secondary_role_name}` : ''}
-                    </div>
-                  </div>
-                  <span className={`badge ${myOwnerObj?.secondary_role_name ? 'badge-success' : 'badge-warning'}`}>
-                    {myOwnerObj?.secondary_role_name ? `منصب وظيفي معتمد: ${myOwnerObj.secondary_role_name}` : 'مالك فقط (بدون منصب وظيفي)'}
-                  </span>
-                </div>
-              );
-            })()}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '14px', color: 'var(--text-secondary)' }}>سجل طلبات المناصب الوظيفية:</h3>
-
-            {positionRequests.length === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                لا توجد طلبات مناصب وظيفية مسجلة حالياً.
+          {/* Current Active Roles Banner */}
+          <div className="card" style={{ border: '2px solid var(--border-accent)' }}>
+            <div style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>🏛️ مناصبي الحالية في الشركة ({activeRoles.length})</h3>
+                <span className="badge badge-success">{activeRoles.length} منصب نشط</span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {positionRequests.map(req => {
-                  const reqOwner = owners.find(o => o.owner_id === req.owner_id);
-                  const roleLabels = {
-                    CEO: '🏛️ المدير العام (CEO)',
-                    COO: '⚙️ المدير التنفيذي (COO)',
-                    CFO: '💰 المدير المالي (CFO)',
-                    CTO: '💻 المدير التقني (CTO)',
-                    CMO: '📣 المدير التسويقي (CMO)',
-                    CHRO: '👥 المدير الإداري للموارد البشرية (CHRO)',
-                    CPO: '📦 مدير المنتجات (CPO)',
-                    PM: '📂 مدير مشروع وتطوير',
-                    FM: '💰 مدير مالي (FM)',
-                    HR: '👥 مدير موارد بشرية',
-                    CREATOR: '🎬 صانع محتوى ومدير شبكات التواصل',
-                    MARKETING: '📱 مدير التسويق الرقمي',
-                    SALES: '🤝 مدير المبيعات',
-                    OPS: '🏭 مدير العمليات',
-                    LEGAL: '⚖️ مدير الشؤون القانونية',
-                    IT: '🔧 مدير تكنولوجيا المعلومات',
-                    SUPERVISOR: '👷 مشرف عام',
-                    ACCOUNTANT: '📊 محاسب',
-                    ENGINEER: '🛠️ مهندس',
-                    DESIGNER: '🎨 مصمم',
-                    ANALYST: '📈 محلل بيانات',
-                    Employee: '⚙️ موظف تشغيلي'
-                  };
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {activeRoles.map(role => {
+                  const pos = allPositions.find(p => p.code === role);
+                  const isOwnerRole = role === 'OWNER';
                   return (
-                    <div key={req.request_id} id={`pos-req-row-${req.request_id}`} style={{
-                      padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
-                      border: `1px solid ${req.status === 'pending' ? 'rgba(243,156,18,0.3)' : req.status === 'approved' ? 'rgba(39,174,96,0.3)' : 'var(--border-primary)'}`,
-                      display: 'flex', flexDirection: 'column', gap: '10px'
+                    <div key={role} style={{
+                      padding: '12px 16px', borderRadius: 'var(--radius-md)', fontSize: '14px', fontWeight: 800,
+                      background: isOwnerRole ? 'rgba(192,57,43,0.08)' : 'rgba(39,174,96,0.08)',
+                      border: `1px solid ${isOwnerRole ? 'rgba(192,57,43,0.3)' : 'rgba(39,174,96,0.3)'}`,
+                      display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 auto'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: '15px' }}>{roleLabels[req.requested_role_name] || req.requested_role_name}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            المالك الطالب: <strong style={{ color: 'var(--text-primary)' }}>{reqOwner?.name || `مالك ${req.owner_id}`}</strong>
-                          </div>
+                      <span style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
+                        background: isOwnerRole ? 'rgba(192,57,43,0.15)' : 'rgba(39,174,96,0.15)',
+                        color: isOwnerRole ? 'var(--danger)' : 'var(--success)',
+                      }}>
+                        {isOwnerRole ? '👑' : '💼'}
+                      </span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: isOwnerRole ? 'var(--danger)' : 'var(--success)', fontSize: '15px' }}>{pos?.name || role}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>
+                          {isOwnerRole ? 'منصب أساسي - لا يمكن التنازل عنه' : 'منصب معتمد'}
                         </div>
-                        <span className={`badge ${req.status === 'approved' ? 'badge-success' : req.status === 'pending' ? 'badge-warning' : 'badge-danger'}`}>
-                          {req.status === 'approved' ? '✅ معتمد' : req.status === 'pending' ? '⏳ قيد الدراسة' : '❌ مرفوض'}
-                        </span>
                       </div>
-
-                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', padding: '10px', borderRadius: 'var(--radius-sm)', margin: 0 }}>
-                        💬 <strong>المؤهلات والتبرير:</strong> {req.reason}
-                      </p>
-
-                      {/* CEO Approvals */}
-                      {isCEO && req.status === 'pending' && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', justifyContent: 'flex-end' }}>
-                          <button
-                            id={`approve-pos-${req.request_id}`}
-                            className="btn btn-sm btn-primary"
-                            onClick={() => handleApprovePositionRequest(req.request_id, true, req.owner_id, req.requested_role_name)}
-                          >
-                            ✅ اعتماد المنصب ودمج الصلاحيات
-                          </button>
-                          <button
-                            id={`reject-pos-${req.request_id}`}
-                            className="btn btn-sm btn-secondary"
-                            style={{ color: 'var(--danger)', borderColor: 'rgba(231,76,60,0.3)' }}
-                            onClick={() => handleApprovePositionRequest(req.request_id, false, req.owner_id, req.requested_role_name)}
-                          >
-                            ❌ رفض الطلب
-                          </button>
-                        </div>
+                      {!isOwnerRole && (
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          style={{ color: 'var(--danger)', borderColor: 'rgba(231,76,60,0.3)', fontSize: '11px', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                          onClick={() => handleDemotePosition(role)}
+                        >
+                          التنازل
+                        </button>
                       )}
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
-
-          {/* New Request Form */}
-          <div className="card" style={{ height: 'fit-content' }}>
-            <div className="card-header">
-              <h3 className="card-title">💼 طلب منصب وظيفي بالشركة</h3>
             </div>
-            <form onSubmit={handleCreatePositionRequest} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="form-group">
-                <label className="form-label">المنصب الوظيفي المطلوب</label>
-                <select id="req-role-select" className="form-select" value={reqRole} onChange={e => setReqRole(e.target.value)}>
-                  <optgroup label="المناصب الإدارية العليا">
-                    <option value="CEO">🏛️ المدير العام (CEO)</option>
-                    <option value="COO">⚙️ المدير التنفيذي (COO)</option>
-                    <option value="CFO">💰 المدير المالي (CFO)</option>
-                    <option value="CTO">💻 المدير التقني (CTO)</option>
-                    <option value="CMO">📣 المدير التسويقي (CMO)</option>
-                    <option value="CHRO">👥 المدير الإداري للموارد البشرية (CHRO)</option>
-                    <option value="CPO">📦 مدير المنتجات (CPO)</option>
-                  </optgroup>
-                  <optgroup label="مناصب الإدارة الوسطى">
-                    <option value="PM">📂 مدير مشروع (PM)</option>
-                    <option value="FM">💰 مدير مالي (FM)</option>
-                    <option value="HR">👥 مدير موارد بشرية (HR)</option>
-                    <option value="CREATOR">🎬 صانع محتوى ومدير شبكات التواصل</option>
-                    <option value="MARKETING">📱 مدير التسويق الرقمي</option>
-                    <option value="SALES">🤝 مدير المبيعات</option>
-                    <option value="OPS">🏭 مدير العمليات</option>
-                    <option value="LEGAL">⚖️ مدير الشؤون القانونية</option>
-                    <option value="IT">🔧 مدير تكنولوجيا المعلومات</option>
-                  </optgroup>
-                  <optgroup label="المناصب التنفيذية والفنية">
-                    <option value="SUPERVISOR">👷 مشرف عام</option>
-                    <option value="ACCOUNTANT">📊 محاسب</option>
-                    <option value="ENGINEER">🛠️ مهندس</option>
-                    <option value="DESIGNER">🎨 مصمم</option>
-                    <option value="ANALYST">📈 محلل بيانات</option>
-                    <option value="Employee">⚙️ موظف تشغيلي</option>
-                  </optgroup>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">خبراتك وتبرير طلب المنصب</label>
-                <textarea
-                  id="req-reason-input"
-                  className="form-textarea"
-                  value={reqReason}
-                  onChange={e => setReqReason(e.target.value)}
-                  placeholder="مثال: لدي خبرة 5 سنوات في إدارة شبكات التواصل وصناعة فيديوهات يوتيوب وتيك توك بيتا وأود توجيه هذا القسم..."
-                  style={{ minHeight: '110px' }}
-                  required
-                />
-              </div>
-              <button id="submit-pos-req-btn" type="submit" className="btn btn-primary w-full">
-                🚀 تقديم طلب المنصب للـ CEO
-              </button>
-            </form>
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+            {/* Position Requests History */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title">📋 سجل طلبات المناصب</h2>
+              </div>
+              {positionRequests.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  لا توجد طلبات مناصب مسجلة حالياً.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {positionRequests.map(req => {
+                    const reqOwner = owners.find(o => o.owner_id === req.owner_id);
+                    const pos = allPositions.find(p => p.code === req.position || p.code === req.requested_role_name);
+                    return (
+                      <div key={req.request_id} style={{
+                        padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+                        border: `1px solid ${req.status === 'pending' ? 'rgba(243,156,18,0.3)' : req.status === 'approved' ? 'rgba(39,174,96,0.3)' : 'rgba(231,76,60,0.3)'}`,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '14px' }}>{pos?.name || req.position || req.requested_role_name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              المالك: <strong>{reqOwner?.name || `مالك ${req.owner_id}`}</strong>
+                            </div>
+                          </div>
+                          <span className={`badge ${req.status === 'approved' ? 'badge-success' : req.status === 'pending' ? 'badge-warning' : 'badge-danger'}`}>
+                            {req.status === 'approved' ? '✅ معتمد' : req.status === 'pending' ? '⏳ قيد الدراسة' : '❌ مرفوض'}
+                          </span>
+                        </div>
+                        {req.reason && (
+                          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'var(--bg-primary)', padding: '8px', borderRadius: 'var(--radius-sm)', margin: 0 }}>
+                            💬 {req.reason}
+                          </p>
+                        )}
+                        {isCEO && req.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '10px', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-sm btn-primary" onClick={() => handleApprovePositionRequest(req.request_id, true, req.owner_id, req.position || req.requested_role_name)}>
+                              ✅ اعتماد
+                            </button>
+                            <button className="btn btn-sm btn-secondary" style={{ color: 'var(--danger)', borderColor: 'rgba(231,76,60,0.3)' }} onClick={() => handleApprovePositionRequest(req.request_id, false, req.owner_id, req.position || req.requested_role_name)}>
+                              ❌ رفض
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* New Request Form */}
+            <div className="card" style={{ height: 'fit-content' }}>
+              <div className="card-header">
+                <h3 className="card-title">💼 طلب منصب وظيفي جديد</h3>
+              </div>
+              <form onSubmit={handleCreatePositionRequest} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div className="form-group">
+                  <label className="form-label">المنصب المطلوب</label>
+                  <select id="req-role-select" className="form-select" value={reqRole} onChange={e => setReqRole(e.target.value)}>
+                    {(() => {
+                      const groups = {};
+                      allPositions.forEach(p => {
+                        if (!groups[p.group]) groups[p.group] = [];
+                        groups[p.group].push(p);
+                      });
+                      return Object.entries(groups).map(([group, positions]) => (
+                        <optgroup key={group} label={group}>
+                          {positions.map(p => (
+                            <option key={p.code} value={p.code} disabled={activeRoles.includes(p.code)}>
+                              {p.name} ({p.code}){activeRoles.includes(p.code) ? ' ✅' : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ));
+                    })()}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">المؤهلات وتبرير الطلب</label>
+                  <textarea
+                    id="req-reason-input"
+                    className="form-textarea"
+                    value={reqReason}
+                    onChange={e => setReqReason(e.target.value)}
+                    placeholder="اكتب خبراتك وما ي justify طلبك لهذا المنصب..."
+                    style={{ minHeight: '100px' }}
+                    required
+                  />
+                </div>
+                <button id="submit-pos-req-btn" type="submit" className="btn btn-primary w-full">
+                  🚀 تقديم طلب المنصب
+                </button>
+              </form>
+            </div>
+
+          </div>
         </div>
       )}
 

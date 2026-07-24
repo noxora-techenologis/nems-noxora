@@ -77,7 +77,20 @@ export function hasAccess(role, module, session) {
   }
   const roleKey = normalizeRoleKey(role);
   const modules = ROLE_MODULES[roleKey] || [];
-  return modules.includes(module);
+  if (modules.includes(module)) return true;
+
+  // For owners: check if active_roles array includes a role that grants this module
+  if (roleKey === 'owner' && session && session.active_roles && Array.isArray(session.active_roles)) {
+    for (const activeRole of session.active_roles) {
+      const arKey = normalizeRoleKey(activeRole);
+      if (arKey !== 'owner') {
+        const arModules = ROLE_MODULES[arKey] || [];
+        if (arModules.includes(module)) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 export function getDashboardPath(role, dashboardType) {

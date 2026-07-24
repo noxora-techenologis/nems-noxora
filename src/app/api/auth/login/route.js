@@ -52,15 +52,18 @@ export async function POST(request) {
 
     let sidebarModules = role?.sidebar_modules || [];
     let secondaryRole = owner?.secondary_role_name || null;
+    const activeRoles = owner?.active_roles || ['OWNER'];
 
-    if (owner && secondaryRole) {
-      let secondaryRoleObj = roles.find(r => r.role_name.toLowerCase() === secondaryRole.toLowerCase());
-      if (!secondaryRoleObj && (secondaryRole === 'CREATOR' || secondaryRole === 'PM')) {
-        secondaryRoleObj = roles.find(r => r.role_name.toLowerCase() === 'pm');
+    // Merge sidebar modules from all active roles (multi-role accumulation)
+    for (const ar of activeRoles) {
+      const arKey = ar?.toLowerCase?.() || '';
+      if (arKey === 'owner') continue; // owner modules already included
+      let arRoleObj = roles.find(r => r.role_name?.toLowerCase() === arKey);
+      if (!arRoleObj && (arKey === 'creator')) {
+        arRoleObj = roles.find(r => r.role_name?.toLowerCase() === 'pm');
       }
-      if (secondaryRoleObj && secondaryRoleObj.sidebar_modules) {
-        // Unique merge of modules
-        sidebarModules = Array.from(new Set([...sidebarModules, ...secondaryRoleObj.sidebar_modules]));
+      if (arRoleObj?.sidebar_modules) {
+        sidebarModules = Array.from(new Set([...sidebarModules, ...arRoleObj.sidebar_modules]));
       }
     }
 
@@ -81,6 +84,7 @@ export async function POST(request) {
         ...safeUser,
         role_name: role?.role_name || 'Unknown',
         secondary_role_name: secondaryRole,
+        active_roles: activeRoles,
         dashboard_type: role?.dashboard_type || 'employee',
         sidebar_modules: sidebarModules,
         employee_id: employee?.employee_id || null,
