@@ -26,7 +26,8 @@ export async function POST(request) {
 
     const totalRevenue = revenues.filter(r => r.status === 'received').reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
+    const totalSalaries = salaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
+    const netProfit = totalRevenue - totalExpenses - totalSalaries;
     const activeProjects = projects.filter(p => p.status === 'active').length;
     const totalEmployees = employees.length;
     const todayPresent = attendance.filter(a => a.date === today && a.status === 'present').length;
@@ -49,7 +50,7 @@ export async function POST(request) {
 
     if (q.includes('ربح') || q.includes('صافي') || q.includes('profit') || q.includes('net')) {
       return NextResponse.json({
-        reply: `📊 **صافي الربح الحالي:** ${netProfit.toLocaleString()} MRU\n\nالإيرادات: ${totalRevenue.toLocaleString()} MRU\nالمصروفات: ${totalExpenses.toLocaleString()} MRU\n\n${netProfit >= 0 ? '✅ الشركة في وضع إيجابي' : '⚠️ الشركة تحقق خسائر حالياً'}`
+        reply: `📊 **صافي الربح الحالي:** ${netProfit.toLocaleString()} MRU\n\nالإيرادات: ${totalRevenue.toLocaleString()} MRU\nالمصروفات: ${totalExpenses.toLocaleString()} MRU\nالرواتب: ${totalSalaries.toLocaleString()} MRU\n\n${netProfit >= 0 ? '✅ الشركة في وضع إيجابي' : '⚠️ الشركة تحقق خسائر حالياً'}`
       });
     }
 

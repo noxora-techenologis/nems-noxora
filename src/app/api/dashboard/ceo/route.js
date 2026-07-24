@@ -3,7 +3,7 @@ import { getTable } from '@/lib/db';
 
 export async function GET() {
   try {
-    const [employees, projects, tasks, attendance, revenues, expenses, leaves, announcements] = await Promise.all([
+    const [employees, projects, tasks, attendance, revenues, expenses, leaves, announcements, salaries] = await Promise.all([
       getTable('employees'),
       getTable('projects'),
       getTable('tasks'),
@@ -12,6 +12,7 @@ export async function GET() {
       getTable('expenses'),
       getTable('leaves'),
       getTable('announcements'),
+      getTable('salaries'),
     ]);
 
     const today = new Date().toISOString().split('T')[0];
@@ -21,6 +22,7 @@ export async function GET() {
     const activeProjects = projects.filter(p => p.status === 'active').length;
     const totalRevenue = revenues.filter(r => r.status === 'received').reduce((s, r) => s + r.amount, 0);
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+    const totalSalaries = salaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
     const todayAttendance = attendance.filter(a => a.date === today && a.status === 'present').length;
     const pendingLeaves = leaves.filter(l => l.status === 'pending').length;
 
@@ -53,7 +55,8 @@ export async function GET() {
         activeProjects,
         totalRevenue,
         totalExpenses,
-        netProfit: totalRevenue - totalExpenses,
+        totalSalaries,
+        netProfit: totalRevenue - totalExpenses - totalSalaries,
         todayAttendance,
         pendingLeaves,
         attendanceRate: totalEmployees > 0 ? Math.round((todayAttendance / totalEmployees) * 100) : 0,

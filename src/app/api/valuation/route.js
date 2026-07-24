@@ -3,15 +3,17 @@ import { getTable, query } from '@/lib/db';
 
 export async function POST() {
   try {
-    const [revenues, expenses] = await Promise.all([
+    const [revenues, expenses, salaries] = await Promise.all([
       getTable('revenues'),
       getTable('expenses'),
+      getTable('salaries'),
     ]);
 
     const totalRevenue = revenues.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const totalSalaries = salaries.reduce((sum, s) => sum + (Number(s.net_salary) || 0), 0);
     const totalAssets = totalRevenue;
-    const totalLiabilities = totalExpenses;
+    const totalLiabilities = totalExpenses + totalSalaries;
     const net = totalAssets - totalLiabilities;
 
     const existing = await getTable('company_valuation');
