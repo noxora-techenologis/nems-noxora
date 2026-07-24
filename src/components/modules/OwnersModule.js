@@ -49,7 +49,6 @@ export default function OwnersModule({ session }) {
 
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
-  const canEditValuation = ['admin', 'owner'].includes(session.role_name.toLowerCase());
 
   useEffect(() => {
     fetchData();
@@ -327,7 +326,7 @@ export default function OwnersModule({ session }) {
 
   const handleUpdateValuation = async (e) => {
     e.preventDefault();
-    if (!canEditValuation) return;
+    if (true) return; // Valuation editing disabled
     try {
       const res = await fetch('/api/data/company_valuation', {
         method: valuation ? 'PUT' : 'POST',
@@ -507,42 +506,7 @@ export default function OwnersModule({ session }) {
                 {formatCurrency(totalAssets)} - {formatCurrency(totalLiabilities)}
               </div>
             </div>
-            {canEditValuation && (
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button
-                  className="btn btn-sm btn-primary"
-                  onClick={() => setShowValuationForm(!showValuationForm)}
-                >
-                  {showValuationForm ? 'إلغاء' : 'تعديل التقييم'}
-                </button>
-              </div>
-            )}
           </div>
-
-          {/* Valuation Edit Form (CEO only) */}
-          {showValuationForm && canEditValuation && (
-            <form onSubmit={handleUpdateValuation} style={{
-              padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-accent)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px'
-            }}>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>تعديل تقييم أصول الشركة</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group">
-                  <label className="form-label">إجمالي الأصول</label>
-                  <input type="number" className="form-input" value={editAssets} onChange={e => setEditAssets(e.target.value)} placeholder="0" required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">إجمالي الالتزامات</label>
-                  <input type="number" className="form-input" value={editLiabilities} onChange={e => setEditLiabilities(e.target.value)} placeholder="0" required />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">ملاحظات</label>
-                <input type="text" className="form-input" value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="ملاحظات التقييم..." />
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>حفظ التقييم</button>
-            </form>
-          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '10px' }}>
             {shares.map((sh, i) => {
