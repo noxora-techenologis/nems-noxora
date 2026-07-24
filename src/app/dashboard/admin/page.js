@@ -95,41 +95,65 @@ export default function AdminDashboard() {
       {/* Company Valuation */}
       <div className="card" style={{ marginBottom: '20px' }}>
         <div className="card-header">
-          <h2 className="card-title">تقييم أصول الشركة</h2>
+          <h2 className="card-title">رأس المال والأرباح</h2>
           <button className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/admin/owners')}>
             الملاك والأسهم ←
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', padding: '4px 0' }}>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الأصول</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
-              {formatCurrency(valuation ? Number(valuation.total_assets) : 0)}
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
+              {formatCurrency(valuation ? Number(valuation.capital) || 25000 : 25000)}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الالتزامات</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--danger)', marginTop: '4px' }}>
-              {formatCurrency(valuation ? Number(valuation.total_liabilities) : 0)}
-            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح الصافية</div>
+            {(() => {
+              const rev = valuation ? Number(valuation.total_assets) : 0;
+              const exp = valuation ? Number(valuation.total_liabilities) : 0;
+              const profit = rev - exp;
+              return (
+                <div style={{ fontSize: '20px', fontWeight: 900, color: profit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '4px' }}>
+                  {profit >= 0 ? '+' : ''}{formatCurrency(profit)}
+                </div>
+              );
+            })()}
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>صافي التقييم</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-              {formatCurrency(valuation ? Number(valuation.total_assets) - Number(valuation.total_liabilities) : 0)}
-            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي التقييم</div>
+            {(() => {
+              const cap = valuation ? Number(valuation.capital) || 25000 : 25000;
+              const rev = valuation ? Number(valuation.total_assets) : 0;
+              const exp = valuation ? Number(valuation.total_liabilities) : 0;
+              const total = cap + rev - exp;
+              return (
+                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
+                  {formatCurrency(total)}
+                </div>
+              );
+            })()}
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>عدد الأسهم</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
               {shares.reduce((s, sh) => s + Number(sh.total_shares), 0)} سهم
             </div>
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-              {formatCurrency((valuation ? Number(valuation.total_assets) - Number(valuation.total_liabilities) : 0) / (shares.reduce((s, sh) => s + Number(sh.total_shares), 0) || 1))} / سهم
-            </div>
+            {(() => {
+              const cap = valuation ? Number(valuation.capital) || 25000 : 25000;
+              const rev = valuation ? Number(valuation.total_assets) : 0;
+              const exp = valuation ? Number(valuation.total_liabilities) : 0;
+              const total = cap + rev - exp;
+              const ts = shares.reduce((s, sh) => s + Number(sh.total_shares), 0) || 1;
+              return (
+                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
+                  {formatCurrency(total / ts)} / سهم
+                </div>
+              );
+            })()}
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الملاك</div>

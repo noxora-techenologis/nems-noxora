@@ -411,9 +411,11 @@ export default function OwnersModule({ session }) {
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
-  const totalAssets = valuation ? Number(valuation.total_assets) : 2250000;
-  const totalLiabilities = valuation ? Number(valuation.total_liabilities) : 150000;
-  const netValuation = totalAssets - totalLiabilities;
+  const capital = valuation ? Number(valuation.capital) : 25000;
+  const totalRevenue = valuation ? Number(valuation.total_assets) : 0;
+  const totalExpensesAndSalaries = valuation ? Number(valuation.total_liabilities) : 0;
+  const netProfit = totalRevenue - totalExpensesAndSalaries;
+  const netValuation = capital + netProfit;
   const shareValue = totalShares > 0 ? netValuation / totalShares : 0;
 
   return (
@@ -474,9 +476,9 @@ export default function OwnersModule({ session }) {
         <div className="card">
           <div className="card-header">
             <div>
-              <h2 className="card-title">توزيع الحصص وتقييم أصول الشركة</h2>
+              <h2 className="card-title">رأس المال والأرباح وتقييم الشركة</h2>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                رأس المال الأولي التأسيسي + صافي الأرباح والإيرادات المشغّلة تلقائياً
+                رأس المال الأولي + الأرباح الصافية (إيرادات - مصروفات - رواتب)
               </div>
             </div>
             <div className="badge badge-success">إجمالي الأسهم الحالية: {formatNumber(totalShares)} سهم</div>
@@ -484,12 +486,24 @@ export default function OwnersModule({ session }) {
 
           {/* Dynamic Valuation Banner */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px',
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px',
             margin: '16px 0', padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-accent)'
           }}>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>التقييم الإجمالي لممتلكات وأصول الشركة</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
+                {formatCurrency(capital)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح الصافية</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '4px' }}>
+                {netProfit >= 0 ? '+' : ''}{formatCurrency(netProfit)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي التقييم (رأس المال + الأرباح)</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
                 {formatCurrency(netValuation)}
               </div>
@@ -498,12 +512,6 @@ export default function OwnersModule({ session }) {
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم الحالية</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
                 {formatCurrency(shareValue)} / سهم
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>صافي الأصول (أصول - التزامات)</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
-                {formatCurrency(totalAssets)} - {formatCurrency(totalLiabilities)}
               </div>
             </div>
           </div>
