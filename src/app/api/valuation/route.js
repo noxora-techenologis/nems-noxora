@@ -1,50 +1,123 @@
 import { NextResponse } from 'next/server';
 import { getTable, query } from '@/lib/db';
 
-export async function POST() {
+// GET: Return current valuation state
+export async function GET() {
   try {
-    const [revenues, expenses, salaries, valuationRows] = await Promise.all([
+    const [valuationRows, revenues, expenses, salaries, shares] = await Promise.all([
+      getTable('company_valuation'),
       getTable('revenues'),
       getTable('expenses'),
       getTable('salaries'),
-      getTable('company_valuation'),
+      getTable('shares'),
     ]);
 
-    const current = valuationRows[0];
-    const capital = current ? (Number(current.capital) || 25000) : 25000;
+    const v = valuationRows[0] || {};
+    const capital = Number(v.capital) || 25000;
+    const retainedEarnings = Number(v.retained_earnings) || 0;
+    const distributedProfit = Number(v.distributed_profit) || 0;
 
-    const totalRevenue = revenues.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    const totalSalaries = salaries.reduce((sum, s) => sum + (Number(s.net_salary) || 0), 0);
-
+    const totalRevenue = revenues.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const totalSalaries = salaries.reduce((s, s2) => s + (Number(s2.net_salary) || 0), 0);
     const netProfit = totalRevenue - totalExpenses - totalSalaries;
-    const netValuation = capital + netProfit;
 
-    const existing = await getTable('company_valuation');
-    const cur = existing[0];
-    const newTotalShares = cur ? (Number(cur.total_shares) || 1000) : 1000;
-    const valuePerShare = newTotalShares > 0 ? netValuation / newTotalShares : 0;
+    const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
+    const companyValue = capital + retainedEarnings;
+    const shareValue = totalShares > 0 ? companyValue / totalShares : 0;
 
-    if (cur) {
+    // Undistributed profit (not yet split 30/70)
+    const undistributed = Math.max(0, netProfit - distributedProfit - retainedEarnings);
+    const pendingToOwners = undistributed * 0.30;
+    const pendingToCompany = undistributed * 0.70;
+
+    return NextResponse.json({
+      capital,
+      retained_earnings: retainedEarnings,
+      distributed_profit: distributedProfit,
+      net_profit: netProfit,
+      company_value: companyValue,
+      total_shares: totalShares,
+      share_value: shareValue,
+      undistributed,
+      pending_to_owners_30: pendingToOwners,
+      pending_to_company_70: pendingToCompany,
+    });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// POST: Distribute profits (30% to owners, 70% retained)
+export async function POST() {
+  try {
+    const [valuationRows, revenues, expenses, salaries, shares, existingDists] = await Promise.all([
+      getTable('company_valuation'),
+      getTable('revenues'),
+      getTable('expenses'),
+      getTable('salaries'),
+      getTable('shares'),
+      getTable('profit_distributions'),
+    ]);
+
+    const v = valuationRows[0] || {};
+    const valuationId = v.valuation_id;
+    const capital = Number(v.capital) || 25000;
+    const retainedEarnings = Number(v.retained_earnings) || 0;
+    const distributedProfit = Number(v.distributed_profit) || 0;
+
+    const totalRevenue = revenues.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const totalSalaries = salaries.reduce((s, s2) => s + (Number(s2.net_salary) || 0), 0);
+    const netProfit = totalRevenue - totalExpenses - totalSalaries;
+
+    const undistributed = netProfit - distributedProfit - retainedEarnings;
+    if (undistributed <= 0) {
+      return NextResponse.json({ error: 'لا توجد أرباح جديدة للتوزيع', net_profit: netProfit, distributed: distributedProfit });
+    }
+
+    const toOwners = undistributed * 0.30;
+    const toCompany = undistributed * 0.70;
+    const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
+
+    // Create distribution records for each owner
+    const now = new Date().toISOString();
+    const currentMonth = new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' });
+
+    for (const sh of shares) {
+      const ownerPercentage = Number(sh.ownership_percentage) || 0;
+      const ownerAmount = totalShares > 0 ? (toOwners * (Number(sh.total_shares) || 0) / totalShares) : 0;
+
       await query(
-        `UPDATE "company_valuation"
-         SET "total_assets" = $1, "total_liabilities" = $2, "notes" = $3,
-             "updated_at" = NOW()
-         WHERE "valuation_id" = $4`,
-        [totalRevenue, totalExpenses + totalSalaries,
-         `رأس المال: ${capital} | إيرادات: ${totalRevenue} | مصروفات: ${totalExpenses} | رواتب: ${totalSalaries} | أرباح صافية: ${netProfit}`,
-         cur.valuation_id]
+        `INSERT INTO "profit_distributions"
+         ("owner_id", "period", "amount", "total_amount", "currency", "owner_percentage", "status", "payment_status", "created_at", "updated_at")
+         VALUES ($1, $2, $3, $4, 'MRU', $5, 'approved', 'pending', $6, $6)`,
+        [sh.owner_id, currentMonth, ownerAmount, toOwners, ownerPercentage, now]
       );
     }
+
+    // Update valuation
+    const newRetained = retainedEarnings + toCompany;
+    const newDistributed = distributedProfit + toOwners;
+    const newCompanyValue = capital + newRetained;
+
+    await query(
+      `UPDATE "company_valuation"
+       SET "retained_earnings" = $1, "distributed_profit" = $2,
+           "notes" = $3, "updated_at" = NOW()
+       WHERE "valuation_id" = $4`,
+      [newRetained, newDistributed,
+       `رأس المال: ${capital} | أرباح محتفظ بها: ${newRetained} | أرباح موزعة: ${newDistributed} | إجمالي القيمة: ${newCompanyValue}`,
+       valuationId]
+    );
 
     return NextResponse.json({
       success: true,
       data: {
-        capital,
-        net_profit: netProfit,
-        net_valuation: netValuation,
-        total_shares: newTotalShares,
-        value_per_share: valuePerShare,
+        distributed_to_owners: toOwners,
+        retained_by_company: toCompany,
+        new_company_value: newCompanyValue,
+        new_share_value: totalShares > 0 ? newCompanyValue / totalShares : 0,
       },
     });
   } catch (err) {

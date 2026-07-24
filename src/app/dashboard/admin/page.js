@@ -102,41 +102,32 @@ export default function AdminDashboard() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', padding: '4px 0' }}>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال التأسيسي</div>
             <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
               {formatCurrency(valuation ? Number(valuation.capital) || 25000 : 25000)}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح الصافية</div>
-            {(() => {
-              const rev = valuation ? Number(valuation.total_assets) : 0;
-              const exp = valuation ? Number(valuation.total_liabilities) : 0;
-              const profit = rev - exp;
-              return (
-                <div style={{ fontSize: '20px', fontWeight: 900, color: profit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '4px' }}>
-                  {profit >= 0 ? '+' : ''}{formatCurrency(profit)}
-                </div>
-              );
-            })()}
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح المحتفظ بها (70%)</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
+              {formatCurrency(valuation ? Number(valuation.retained_earnings) || 0 : 0)}
+            </div>
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي التقييم</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي قيمة الشركة</div>
             {(() => {
               const cap = valuation ? Number(valuation.capital) || 25000 : 25000;
-              const rev = valuation ? Number(valuation.total_assets) : 0;
-              const exp = valuation ? Number(valuation.total_liabilities) : 0;
-              const total = cap + rev - exp;
+              const retained = valuation ? Number(valuation.retained_earnings) || 0 : 0;
               return (
-                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-                  {formatCurrency(total)}
+                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
+                  {formatCurrency(cap + retained)}
                 </div>
               );
             })()}
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>عدد الأسهم</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
               {shares.reduce((s, sh) => s + Number(sh.total_shares), 0)} سهم
             </div>
           </div>
@@ -144,13 +135,11 @@ export default function AdminDashboard() {
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم</div>
             {(() => {
               const cap = valuation ? Number(valuation.capital) || 25000 : 25000;
-              const rev = valuation ? Number(valuation.total_assets) : 0;
-              const exp = valuation ? Number(valuation.total_liabilities) : 0;
-              const total = cap + rev - exp;
+              const retained = valuation ? Number(valuation.retained_earnings) || 0 : 0;
               const ts = shares.reduce((s, sh) => s + Number(sh.total_shares), 0) || 1;
               return (
                 <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-                  {formatCurrency(total / ts)} / سهم
+                  {formatCurrency((cap + retained) / ts)} / سهم
                 </div>
               );
             })()}

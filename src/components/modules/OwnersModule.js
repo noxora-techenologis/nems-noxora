@@ -15,6 +15,8 @@ export default function OwnersModule({ session }) {
   const [shareTransactions, setShareTransactions] = useState([]);
   const [positionRequests, setPositionRequests] = useState([]);
   const [valuation, setValuation] = useState(null);
+  const [profitInfo, setProfitInfo] = useState(null);
+  const [distributions, setDistributions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('shares'); // shares, transactions, positions, votes, new-vote
   const [, setCurrTick] = useState(0);
@@ -57,7 +59,7 @@ export default function OwnersModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes] = await Promise.all([
+      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes, profRes, distRes] = await Promise.all([
         fetch('/api/data/owners'),
         fetch('/api/data/shares'),
         fetch('/api/data/votes'),
@@ -66,6 +68,8 @@ export default function OwnersModule({ session }) {
         fetch('/api/data/share_transactions'),
         fetch('/api/data/position_requests'),
         fetch('/api/data/company_valuation'),
+        fetch('/api/valuation'),
+        fetch('/api/data/profit_distributions'),
       ]);
       const ownData = await ownRes.json();
       const shrData = await shrRes.json();
@@ -75,6 +79,8 @@ export default function OwnersModule({ session }) {
       const txnData = await txnRes.json();
       const posData = await posRes.json();
       const valData = await valRes.json();
+      const profData = await profRes.json();
+      const distData = await distRes.json();
 
       setOwners(ownData.data || []);
       setShares(shrData.data || []);
@@ -83,6 +89,8 @@ export default function OwnersModule({ session }) {
       setUserVotes(uVtData.data || []);
       setShareTransactions(txnData.data || []);
       setPositionRequests(posData.data || []);
+      setDistributions(distData.data || []);
+      setProfitInfo(profData || null);
       const val = (valData.data || [])[0] || null;
       setValuation(val);
       if (val) {
@@ -411,12 +419,13 @@ export default function OwnersModule({ session }) {
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
-  const capital = valuation ? Number(valuation.capital) : 25000;
-  const totalRevenue = valuation ? Number(valuation.total_assets) : 0;
-  const totalExpensesAndSalaries = valuation ? Number(valuation.total_liabilities) : 0;
-  const netProfit = totalRevenue - totalExpensesAndSalaries;
-  const netValuation = capital + netProfit;
-  const shareValue = totalShares > 0 ? netValuation / totalShares : 0;
+  const capital = valuation ? Number(valuation.capital) || 25000 : 25000;
+  const retainedEarnings = valuation ? Number(valuation.retained_earnings) || 0 : 0;
+  const companyValue = capital + retainedEarnings;
+  const shareValue = totalShares > 0 ? companyValue / totalShares : 0;
+  const netProfit = profitInfo ? Number(profitInfo.net_profit) || 0 : 0;
+  const pendingToOwners = profitInfo ? Number(profitInfo.pending_to_owners_30) || 0 : 0;
+  const pendingToCompany = profitInfo ? Number(profitInfo.pending_to_company_70) || 0 : 0;
 
   return (
     <div>
@@ -478,10 +487,10 @@ export default function OwnersModule({ session }) {
             <div>
               <h2 className="card-title">رأس المال والأرباح وتقييم الشركة</h2>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                رأس المال الأولي + الأرباح الصافية (إيرادات - مصروفات - رواتب)
+                رأس المال التأسيسي + الأرباح المحتفظ بها (70%) — التوزيع (30%) للملاك
               </div>
             </div>
-            <div className="badge badge-success">إجمالي الأسهم الحالية: {formatNumber(totalShares)} سهم</div>
+            <div className="badge badge-success">إجمالي الأسهم: {formatNumber(totalShares)} سهم</div>
           </div>
 
           {/* Dynamic Valuation Banner */}
@@ -491,21 +500,21 @@ export default function OwnersModule({ session }) {
             border: '1px solid var(--border-accent)'
           }}>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال التأسيسي</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
                 {formatCurrency(capital)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح الصافية</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: netProfit >= 0 ? 'var(--success)' : 'var(--danger)', marginTop: '4px' }}>
-                {netProfit >= 0 ? '+' : ''}{formatCurrency(netProfit)}
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح المحتفظ بها (70%)</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
+                {formatCurrency(retainedEarnings)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي التقييم (رأس المال + الأرباح)</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي قيمة الشركة</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
-                {formatCurrency(netValuation)}
+                {formatCurrency(companyValue)}
               </div>
             </div>
             <div>
@@ -514,13 +523,45 @@ export default function OwnersModule({ session }) {
                 {formatCurrency(shareValue)} / سهم
               </div>
             </div>
+            {pendingToOwners > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>أرباح للتوزيع (30%)</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--warning)', marginTop: '4px' }}>
+                  {formatCurrency(pendingToOwners)}
+                </div>
+              </div>
+            )}
           </div>
+
+          {isCEO && pendingToOwners > 0 && (
+            <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--warning)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14px' }}>توزيع الأرباح المتاحة</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  30% للملاك ({formatCurrency(pendingToOwners)}) | 70% للشركة ({formatCurrency(pendingToCompany)})
+                </div>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={async () => {
+                if (!confirm('هل تريد توزيع الأرباح الآن؟')) return;
+                const res = await fetch('/api/valuation', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                  alert(`تم التوزيع بنجاح!\nأرباح للملاك: ${formatCurrency(data.data.distributed_to_owners)}\nأرباح محتفظ بها: ${formatCurrency(data.data.retained_by_company)}\nقيمة الشركة الجديدة: ${formatCurrency(data.data.new_company_value)}`);
+                  fetchData();
+                } else {
+                  alert(data.error || 'فشلت عملية التوزيع');
+                }
+              }}>💰 توزيع الأرباح</button>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '10px' }}>
             {shares.map((sh, i) => {
               const owner = owners.find(o => o.owner_id === sh.owner_id);
               const cardColor = COLORS[i % COLORS.length];
               const ownerValuation = sh.total_shares * shareValue;
+              const ownerDists = distributions.filter(d => d.owner_id === sh.owner_id);
+              const totalDistributed = ownerDists.reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
               return (
                 <div key={sh.share_id} style={{
@@ -543,14 +584,14 @@ export default function OwnersModule({ session }) {
                       <div style={{ fontWeight: 800, fontSize: '13px', marginTop: '2px' }}>{formatNumber(sh.total_shares)} سهم</div>
                     </div>
                     <div>
-                      <span className="text-muted">القيمة الاستثمارية الحالية</span>
+                      <span className="text-muted">القيمة الاستثمارية</span>
                       <div style={{ fontWeight: 800, fontSize: '13px', marginTop: '2px' }}>{formatCurrency(ownerValuation)}</div>
                     </div>
                   </div>
-                  <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', borderRight: '3px solid var(--noxora-red)' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>القيمة الاستثمارية لهذا المالك</span>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
-                      {formatCurrency(ownerValuation)}
+                  <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', borderRight: `3px solid ${cardColor}` }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الأرباح الموزعة (30%)</span>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--success)', marginTop: '4px' }}>
+                      {formatCurrency(totalDistributed)}
                     </div>
                   </div>
                 </div>
