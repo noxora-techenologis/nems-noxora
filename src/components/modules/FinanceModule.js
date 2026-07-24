@@ -87,7 +87,7 @@ export default function FinanceModule({ session }) {
           title: revTitle,
           amount: Number(revAmount),
           type: revType,
-          currency: 'SAR',
+          currency: 'MRU',
           date: new Date().toISOString().split('T')[0],
           payment_method: 'تحويل بنكي',
           status: 'received',
@@ -123,7 +123,7 @@ export default function FinanceModule({ session }) {
           amount: Number(expAmount),
           category: expCategory,
           vendor: expVendor,
-          currency: 'SAR',
+          currency: 'MRU',
           date: new Date().toISOString().split('T')[0],
           status: 'approved',
           approval_threshold: 5000,
@@ -224,8 +224,8 @@ export default function FinanceModule({ session }) {
     );
   }
 
-  // Format using NEMS unified formatter (enforces Ghubariya numerals and USD/MRU currency)
-  const formatCurrency = (n, curr = 'MRU') => formatCurrencyImport(n, curr);
+  // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
+  const formatCurrency = (n) => formatCurrencyImport(n);
 
   const totalRev = revenues.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const totalExp = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
@@ -263,18 +263,18 @@ export default function FinanceModule({ session }) {
           <div className="stats-grid">
             <div className="stat-card green">
               <div className="stat-icon green">📈</div>
-              <div className="stat-value">{formatCurrency(totalRev, 'SAR')}</div>
+              <div className="stat-value">{formatCurrency(totalRev)}</div>
               <div className="stat-label">إجمالي المقبوضات</div>
             </div>
             <div className="stat-card">
               <div className="stat-icon red">📉</div>
-              <div className="stat-value">{formatCurrency(totalExp, 'SAR')}</div>
+              <div className="stat-value">{formatCurrency(totalExp)}</div>
               <div className="stat-label">إجمالي المدفوعات</div>
             </div>
             <div className="stat-card">
               <div className="stat-icon green">🏆</div>
               <div className="stat-value" style={{ color: netIncome >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                {formatCurrency(netIncome, 'SAR')}
+                {formatCurrency(netIncome)}
               </div>
               <div className="stat-label">صافي رصيد الخزينة</div>
             </div>
@@ -301,7 +301,7 @@ export default function FinanceModule({ session }) {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">المبلغ (SAR)</label>
+                    <label className="form-label">المبلغ (أوقية)</label>
                     <input
                       id="rev-amount"
                       type="number"
@@ -351,7 +351,7 @@ export default function FinanceModule({ session }) {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div className="form-group">
-                      <label className="form-label">المبلغ (SAR)</label>
+                      <label className="form-label">المبلغ (أوقية)</label>
                       <input
                         id="exp-amount"
                         type="number"

@@ -101,9 +101,7 @@ export default function DashboardLayout({ children }) {
   };
 
   const handleCurrencyToggle = () => {
-    const nextCurr = curr === 'MRU' ? 'USD' : 'MRU';
-    setPreferredCurrency(nextCurr);
-    setCurr(nextCurr);
+    // Currency is fixed to MRU (أوقية)
   };
 
   const handleAiSend = async (customPrompt) => {
