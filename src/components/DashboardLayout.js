@@ -24,6 +24,7 @@ const NAV_ITEMS = {
   settings:   { icon: '⚙️', label: 'الإعدادات', path: '/settings' },
   users:      { icon: '👤', label: 'المستخدمون', path: '/users' },
   logs:       { icon: '📋', label: 'سجل النظام', path: '/logs' },
+  debts:      { icon: '📑', label: 'ديون ومستحقات', path: '/debts' },
 };
 
 const ROLE_COLORS = {

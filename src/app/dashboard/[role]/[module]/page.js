@@ -19,6 +19,7 @@ import ReportsModule from '@/components/modules/ReportsModule';
 import SettingsModule from '@/components/modules/SettingsModule';
 import UsersModule from '@/components/modules/UsersModule';
 import LogsModule from '@/components/modules/LogsModule';
+import DebtsModule from '@/components/modules/DebtsModule';
 
 export default function DynamicModulePage() {
   const params = useParams();
@@ -110,6 +111,8 @@ export default function DynamicModulePage() {
         return <UsersModule session={session} />;
       case 'logs':
         return <LogsModule session={session} />;
+      case 'debts':
+        return <DebtsModule session={session} />;
       default:
         return (
           <div className="card text-center" style={{ padding: '40px' }}>

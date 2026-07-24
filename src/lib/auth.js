@@ -50,12 +50,12 @@ export function requireAuth(router) {
 // Role-based access control
 export const ROLE_MODULES = {
   admin:    ['dashboard', 'users', 'settings', 'logs', 'owners'],
-  ceo:      ['dashboard', 'employees', 'attendance', 'projects', 'clients', 'finance', 'owners', 'meetings', 'documents', 'messages', 'reports', 'settings'],
-  fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings'],
+  ceo:      ['dashboard', 'employees', 'attendance', 'projects', 'clients', 'finance', 'owners', 'meetings', 'documents', 'messages', 'reports', 'settings', 'debts'],
+  fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings', 'debts'],
   hr:       ['dashboard', 'employees', 'attendance', 'meetings', 'reports'],
   pm:       ['dashboard', 'projects', 'clients', 'meetings', 'documents'],
   employee: ['dashboard', 'attendance', 'projects', 'meetings', 'documents', 'messages'],
-  owner:    ['dashboard', 'owners', 'reports'],
+  owner:    ['dashboard', 'owners', 'reports', 'debts'],
 };
 
 // Normalize role string or Arabic role title into valid role key
