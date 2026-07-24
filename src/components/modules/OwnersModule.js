@@ -747,11 +747,27 @@ export default function OwnersModule({ session }) {
                 {positionRequests.map(req => {
                   const reqOwner = owners.find(o => o.owner_id === req.owner_id);
                   const roleLabels = {
+                    CEO: '🏛️ المدير العام (CEO)',
+                    COO: '⚙️ المدير التنفيذي (COO)',
+                    CFO: '💰 المدير المالي (CFO)',
+                    CTO: '💻 المدير التقني (CTO)',
+                    CMO: '📣 المدير التسويقي (CMO)',
+                    CHRO: '👥 المدير الإداري للموارد البشرية (CHRO)',
+                    CPO: '📦 مدير المنتجات (CPO)',
                     PM: '📂 مدير مشروع وتطوير',
-                    FM: '💰 مدير مالي (CFO)',
+                    FM: '💰 مدير مالي (FM)',
                     HR: '👥 مدير موارد بشرية',
-                    CEO: '🏛️ مدير عام (CEO)',
                     CREATOR: '🎬 صانع محتوى ومدير شبكات التواصل',
+                    MARKETING: '📱 مدير التسويق الرقمي',
+                    SALES: '🤝 مدير المبيعات',
+                    OPS: '🏭 مدير العمليات',
+                    LEGAL: '⚖️ مدير الشؤون القانونية',
+                    IT: '🔧 مدير تكنولوجيا المعلومات',
+                    SUPERVISOR: '👷 مشرف عام',
+                    ACCOUNTANT: '📊 محاسب',
+                    ENGINEER: '🛠️ مهندس',
+                    DESIGNER: '🎨 مصمم',
+                    ANALYST: '📈 محلل بيانات',
                     Employee: '⚙️ موظف تشغيلي'
                   };
                   return (
@@ -812,11 +828,34 @@ export default function OwnersModule({ session }) {
               <div className="form-group">
                 <label className="form-label">المنصب الوظيفي المطلوب</label>
                 <select id="req-role-select" className="form-select" value={reqRole} onChange={e => setReqRole(e.target.value)}>
-                  <option value="PM">📂 مدير مشروع (PM)</option>
-                  <option value="CREATOR">🎬 صانع محتوى ومدير شبكات التواصل (YouTube & TikTok)</option>
-                  <option value="FM">💰 مدير مالي (FM)</option>
-                  <option value="HR">👥 مدير موارد بشرية (HR)</option>
-                  <option value="Employee">⚙️ موظف متخصص (Employee)</option>
+                  <optgroup label="المناصب الإدارية العليا">
+                    <option value="CEO">🏛️ المدير العام (CEO)</option>
+                    <option value="COO">⚙️ المدير التنفيذي (COO)</option>
+                    <option value="CFO">💰 المدير المالي (CFO)</option>
+                    <option value="CTO">💻 المدير التقني (CTO)</option>
+                    <option value="CMO">📣 المدير التسويقي (CMO)</option>
+                    <option value="CHRO">👥 المدير الإداري للموارد البشرية (CHRO)</option>
+                    <option value="CPO">📦 مدير المنتجات (CPO)</option>
+                  </optgroup>
+                  <optgroup label="مناصب الإدارة الوسطى">
+                    <option value="PM">📂 مدير مشروع (PM)</option>
+                    <option value="FM">💰 مدير مالي (FM)</option>
+                    <option value="HR">👥 مدير موارد بشرية (HR)</option>
+                    <option value="CREATOR">🎬 صانع محتوى ومدير شبكات التواصل</option>
+                    <option value="MARKETING">📱 مدير التسويق الرقمي</option>
+                    <option value="SALES">🤝 مدير المبيعات</option>
+                    <option value="OPS">🏭 مدير العمليات</option>
+                    <option value="LEGAL">⚖️ مدير الشؤون القانونية</option>
+                    <option value="IT">🔧 مدير تكنولوجيا المعلومات</option>
+                  </optgroup>
+                  <optgroup label="المناصب التنفيذية والفنية">
+                    <option value="SUPERVISOR">👷 مشرف عام</option>
+                    <option value="ACCOUNTANT">📊 محاسب</option>
+                    <option value="ENGINEER">🛠️ مهندس</option>
+                    <option value="DESIGNER">🎨 مصمم</option>
+                    <option value="ANALYST">📈 محلل بيانات</option>
+                    <option value="Employee">⚙️ موظف تشغيلي</option>
+                  </optgroup>
                 </select>
               </div>
               <div className="form-group">
