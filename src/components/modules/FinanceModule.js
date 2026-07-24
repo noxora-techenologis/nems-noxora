@@ -98,6 +98,8 @@ export default function FinanceModule({ session }) {
 
       const result = await res.json();
       if (result.success) {
+        // Auto-update company valuation
+        fetch('/api/valuation', { method: 'POST' }).catch(() => {});
         alert('تمت إضافة الإيراد بنجاح!');
         setRevTitle('');
         setRevAmount('');
@@ -136,6 +138,8 @@ export default function FinanceModule({ session }) {
 
       const result = await res.json();
       if (result.success) {
+        // Auto-update company valuation
+        fetch('/api/valuation', { method: 'POST' }).catch(() => {});
         alert('تمت إضافة المصروف بنجاح!');
         setExpTitle('');
         setExpAmount('');
