@@ -15,7 +15,7 @@ export const SAFE_TABLES = new Set([
   'conversation_members', 'messages', 'files', 'project_documents',
   'file_versions', 'announcements', 'notifications', 'feedback_reports',
   'audit_log', 'system_settings', 'position_requests', 'permissions',
-  'role_permissions'
+  'role_permissions', 'company_valuation'
 ]);
 
 const PRIMARY_KEYS = {
@@ -32,7 +32,7 @@ const PRIMARY_KEYS = {
   announcements: 'announcement_id', notifications: 'notification_id',
   feedback_reports: 'id', audit_log: 'log_id', system_settings: 'setting_id',
   position_requests: 'request_id', permissions: 'permission_id',
-  role_permissions: 'id'
+  role_permissions: 'id', company_valuation: 'valuation_id'
 };
 
 const MODULE_MAP = {
@@ -48,7 +48,8 @@ const MODULE_MAP = {
   conversations: 'Collaboration', conversation_members: 'Collaboration', messages: 'Collaboration',
   announcements: 'Collaboration',
   files: 'Documents', project_documents: 'Documents', file_versions: 'Documents',
-  notifications: 'System', feedback_reports: 'System', audit_log: 'System', system_settings: 'System'
+  notifications: 'System', feedback_reports: 'System', audit_log: 'System', system_settings: 'System',
+  company_valuation: 'Shares'
 };
 
 let pool = null;

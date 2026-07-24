@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
+import { formatCurrency as fmtCur } from '@/lib/format';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -15,12 +16,18 @@ export default function AdminDashboard() {
       fetch('/api/data/roles').then(r => r.json()),
       fetch('/api/data/audit_log').then(r => r.json()),
       fetch('/api/data/system_settings').then(r => r.json()),
-    ]).then(([usrs, rls, logs, sets]) => {
+      fetch('/api/data/company_valuation').then(r => r.json()),
+      fetch('/api/data/owners').then(r => r.json()),
+      fetch('/api/data/shares').then(r => r.json()),
+    ]).then(([usrs, rls, logs, sets, val, own, shr]) => {
       setData({
         users: usrs.data || [],
         roles: rls.data || [],
         auditLog: (logs.data || []).slice(-10).reverse(),
         settings: sets.data || [],
+        valuation: (val.data || [])[0] || null,
+        owners: own.data || [],
+        shares: shr.data || [],
       });
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -35,8 +42,9 @@ export default function AdminDashboard() {
     </DashboardLayout>
   );
 
-  const { users = [], roles = [], auditLog = [], settings = [] } = data || {};
+  const { users = [], roles = [], auditLog = [], settings = [], valuation = null, owners = [], shares = [] } = data || {};
   const activeUsers = users.filter(u => u.status === 'active');
+  const formatCurrency = (n) => fmtCur(n, 'MRU');
 
   const ACTION_COLORS = {
     create: 'var(--success)', update: 'var(--info)', delete: 'var(--danger)',
@@ -81,6 +89,54 @@ export default function AdminDashboard() {
           <div className="stat-icon purple">📋</div>
           <div className="stat-value">{auditLog.length}</div>
           <div className="stat-label">إجراءات مسجلة</div>
+        </div>
+      </div>
+
+      {/* Company Valuation */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card-header">
+          <h2 className="card-title">تقييم أصول الشركة</h2>
+          <button className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/admin/owners')}>
+            الملاك والأسهم ←
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', padding: '4px 0' }}>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الأصول</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
+              {formatCurrency(valuation ? Number(valuation.total_assets) : 0)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الالتزامات</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--danger)', marginTop: '4px' }}>
+              {formatCurrency(valuation ? Number(valuation.total_liabilities) : 0)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>صافي التقييم</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
+              {formatCurrency(valuation ? Number(valuation.total_assets) - Number(valuation.total_liabilities) : 0)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>عدد الأسهم</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
+              {shares.reduce((s, sh) => s + Number(sh.total_shares), 0)} سهم
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
+              {formatCurrency((valuation ? Number(valuation.total_assets) - Number(valuation.total_liabilities) : 0) / (shares.reduce((s, sh) => s + Number(sh.total_shares), 0) || 1))} / سهم
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الملاك</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {owners.length} مالك
+            </div>
+          </div>
         </div>
       </div>
 

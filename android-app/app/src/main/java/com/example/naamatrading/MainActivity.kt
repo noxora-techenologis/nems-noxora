@@ -2,12 +2,19 @@ package com.example.naamatrading
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
 
@@ -17,18 +24,32 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        window.addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED)
+
         val wv = WebView(this)
         webView = wv
-        setContentView(wv)
+
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(0xFF0A0B0E.toInt())
+            addView(wv, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(container) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
+        setContentView(container)
 
         val settings: WebSettings = wv.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.allowFileAccess = true
 
-        // KEY: useWideViewPort=true tells WebView to honor the page's
-        // <meta name="viewport" content="width=device-width"> tag.
-        // loadWithOverviewMode=false means don't zoom out to fit — show 1:1
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = false
 
@@ -37,12 +58,11 @@ class MainActivity : AppCompatActivity() {
         settings.displayZoomControls = false
         settings.textZoom = 100
 
+        settings.setSupportMultipleWindows(false)
+        settings.javaScriptCanOpenWindowsAutomatically = false
+
         settings.cacheMode = WebSettings.LOAD_NO_CACHE
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
-        settings.userAgentString =
-            "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
         wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
@@ -54,7 +74,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
-                // Enforce correct mobile viewport after page loads
                 view.evaluateJavascript("""
                     (function() {
                         var meta = document.querySelector('meta[name="viewport"]');
@@ -93,8 +112,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        webView?.onPause()
         super.onPause()
+        webView?.onPause()
     }
 
     override fun onDestroy() {

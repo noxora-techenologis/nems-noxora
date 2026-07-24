@@ -14,6 +14,7 @@ export default function OwnersModule({ session }) {
   const [userVotes, setUserVotes] = useState([]);
   const [shareTransactions, setShareTransactions] = useState([]);
   const [positionRequests, setPositionRequests] = useState([]);
+  const [valuation, setValuation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('shares'); // shares, transactions, positions, votes, new-vote
   const [, setCurrTick] = useState(0);
@@ -40,6 +41,12 @@ export default function OwnersModule({ session }) {
   const [reqRole, setReqRole] = useState('PM');
   const [reqReason, setReqReason] = useState('');
 
+  // Valuation edit form
+  const [editAssets, setEditAssets] = useState('');
+  const [editLiabilities, setEditLiabilities] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [showValuationForm, setShowValuationForm] = useState(false);
+
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
 
@@ -50,7 +57,7 @@ export default function OwnersModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes] = await Promise.all([
+      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes] = await Promise.all([
         fetch('/api/data/owners'),
         fetch('/api/data/shares'),
         fetch('/api/data/votes'),
@@ -58,6 +65,7 @@ export default function OwnersModule({ session }) {
         fetch('/api/data/user_votes'),
         fetch('/api/data/share_transactions'),
         fetch('/api/data/position_requests'),
+        fetch('/api/data/company_valuation'),
       ]);
       const ownData = await ownRes.json();
       const shrData = await shrRes.json();
@@ -66,6 +74,7 @@ export default function OwnersModule({ session }) {
       const uVtData = await uVtRes.json();
       const txnData = await txnRes.json();
       const posData = await posRes.json();
+      const valData = await valRes.json();
 
       setOwners(ownData.data || []);
       setShares(shrData.data || []);
@@ -74,6 +83,13 @@ export default function OwnersModule({ session }) {
       setUserVotes(uVtData.data || []);
       setShareTransactions(txnData.data || []);
       setPositionRequests(posData.data || []);
+      const val = (valData.data || [])[0] || null;
+      setValuation(val);
+      if (val) {
+        setEditAssets(String(val.total_assets || ''));
+        setEditLiabilities(String(val.total_liabilities || ''));
+        setEditNotes(val.notes || '');
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -308,6 +324,41 @@ export default function OwnersModule({ session }) {
     }
   };
 
+  const handleUpdateValuation = async (e) => {
+    e.preventDefault();
+    if (!isCEO) return;
+    try {
+      const res = await fetch('/api/data/company_valuation', {
+        method: valuation ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(valuation ? {
+          _id: valuation.valuation_id,
+          _userId: session.user_id,
+          total_assets: Number(editAssets) || 0,
+          total_liabilities: Number(editLiabilities) || 0,
+          notes: editNotes,
+          updated_by: session.user_id,
+        } : {
+          total_assets: Number(editAssets) || 0,
+          total_liabilities: Number(editLiabilities) || 0,
+          notes: editNotes,
+          updated_by: session.user_id,
+          _userId: session.user_id,
+        })
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم تحديث تقييم أصول الشركة بنجاح!');
+        setShowValuationForm(false);
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت العملية');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
+
   const handleApprovePositionRequest = async (reqId, approved, ownerId, roleName) => {
     try {
       // 1. Update position_requests status
@@ -360,6 +411,10 @@ export default function OwnersModule({ session }) {
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
+  const totalAssets = valuation ? Number(valuation.total_assets) : 2250000;
+  const totalLiabilities = valuation ? Number(valuation.total_liabilities) : 150000;
+  const netValuation = totalAssets - totalLiabilities;
+  const shareValue = totalShares > 0 ? netValuation / totalShares : 0;
 
   return (
     <div>
@@ -434,31 +489,65 @@ export default function OwnersModule({ session }) {
             border: '1px solid var(--border-accent)'
           }}>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>🏛️ التقييم الإجمالي لممتلكات وأصول الشركة</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>التقييم الإجمالي لممتلكات وأصول الشركة</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
-                {formatCurrency(1000000 + 1250000 - 150000)}
+                {formatCurrency(netValuation)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📈 قيمة السهم التأسيسي الحالي (Nominal/Market)</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم الحالية</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-                {formatCurrency((1000000 + 1250000 - 150000) / (totalShares || 1000))} / سهم
+                {formatCurrency(shareValue)} / سهم
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>🚀 نمو القيمة الرأسمالية (Capital Growth)</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>صافي الأصول (أصول - التزامات)</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
-                +110% 📈 (توسع مستمر)
+                {formatCurrency(totalAssets)} - {formatCurrency(totalLiabilities)}
               </div>
             </div>
+            {isCEO && (
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setShowValuationForm(!showValuationForm)}
+                >
+                  {showValuationForm ? 'إلغاء' : 'تعديل التقييم'}
+                </button>
+              </div>
+            )}
           </div>
+
+          {/* Valuation Edit Form (CEO only) */}
+          {showValuationForm && isCEO && (
+            <form onSubmit={handleUpdateValuation} style={{
+              padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-accent)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px'
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>تعديل تقييم أصول الشركة</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">إجمالي الأصول</label>
+                  <input type="number" className="form-input" value={editAssets} onChange={e => setEditAssets(e.target.value)} placeholder="0" required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">إجمالي الالتزامات</label>
+                  <input type="number" className="form-input" value={editLiabilities} onChange={e => setEditLiabilities(e.target.value)} placeholder="0" required />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">ملاحظات</label>
+                <input type="text" className="form-input" value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="ملاحظات التقييم..." />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>حفظ التقييم</button>
+            </form>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '10px' }}>
             {shares.map((sh, i) => {
               const owner = owners.find(o => o.owner_id === sh.owner_id);
               const cardColor = COLORS[i % COLORS.length];
-              const currentShareValue = (1000000 + 1250000 - 150000) / (totalShares || 1000);
-              const ownerValuation = sh.total_shares * currentShareValue;
+              const ownerValuation = sh.total_shares * shareValue;
 
               return (
                 <div key={sh.share_id} style={{
@@ -486,9 +575,9 @@ export default function OwnersModule({ session }) {
                     </div>
                   </div>
                   <div style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', borderRight: '3px solid var(--noxora-red)' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>معدل النمو والعائد</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>القيمة الاستثمارية لهذا المالك</span>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
-                      +210% عائد استثماري محقق
+                      {formatCurrency(ownerValuation)}
                     </div>
                   </div>
                 </div>
