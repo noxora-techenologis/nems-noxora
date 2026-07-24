@@ -17,8 +17,9 @@ export default function OwnersModule({ session }) {
   const [valuation, setValuation] = useState(null);
   const [profitInfo, setProfitInfo] = useState(null);
   const [distributions, setDistributions] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('shares'); // shares, transactions, positions, votes, new-vote
+  const [activeTab, setActiveTab] = useState('shares'); // shares, transactions, positions, votes, new-vote, withdrawals
   const [, setCurrTick] = useState(0);
 
   useEffect(() => {
@@ -43,6 +44,12 @@ export default function OwnersModule({ session }) {
   const [reqRole, setReqRole] = useState('PM');
   const [reqReason, setReqReason] = useState('');
 
+  // Withdrawal form
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawMethod, setWithdrawMethod] = useState('تحويل بنكي');
+  const [withdrawNotes, setWithdrawNotes] = useState('');
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
+
   // Valuation edit form
   const [editAssets, setEditAssets] = useState('');
   const [editLiabilities, setEditLiabilities] = useState('');
@@ -59,7 +66,7 @@ export default function OwnersModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes, profRes, distRes] = await Promise.all([
+      const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes, profRes, distRes, wdRes] = await Promise.all([
         fetch('/api/data/owners'),
         fetch('/api/data/shares'),
         fetch('/api/data/votes'),
@@ -70,6 +77,7 @@ export default function OwnersModule({ session }) {
         fetch('/api/data/company_valuation'),
         fetch('/api/valuation'),
         fetch('/api/data/profit_distributions'),
+        fetch(`/api/withdrawals?ownerId=${session.owner_id || ''}&role=${session.role_name || ''}`),
       ]);
       const ownData = await ownRes.json();
       const shrData = await shrRes.json();
@@ -81,6 +89,7 @@ export default function OwnersModule({ session }) {
       const valData = await valRes.json();
       const profData = await profRes.json();
       const distData = await distRes.json();
+      const wdData = await wdRes.json();
 
       setOwners(ownData.data || []);
       setShares(shrData.data || []);
@@ -90,6 +99,7 @@ export default function OwnersModule({ session }) {
       setShareTransactions(txnData.data || []);
       setPositionRequests(posData.data || []);
       setDistributions(distData.data || []);
+      setWithdrawals(wdData.data || []);
       setProfitInfo(profData || null);
       const val = (valData.data || [])[0] || null;
       setValuation(val);
@@ -104,6 +114,101 @@ export default function OwnersModule({ session }) {
       setLoading(false);
     }
   };
+
+  // === Withdrawal handlers ===
+  const handleCreateWithdrawal = async (e) => {
+    e.preventDefault();
+    if (!withdrawAmount || Number(withdrawAmount) <= 0) return;
+    try {
+      const res = await fetch('/api/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_id: session.owner_id,
+          amount: Number(withdrawAmount),
+          payment_method: withdrawMethod,
+          notes: withdrawNotes,
+          _userId: session.user_id,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم إرسال طلب السحب بنجاح! في انتظار المراجعة المالية.');
+        setWithdrawAmount('');
+        setWithdrawMethod('تحويل بنكي');
+        setWithdrawNotes('');
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت عملية الإرسال');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
+
+  const handleUpdateWithdrawalStatus = async (requestId, newStatus) => {
+    const labels = { FINANCIALLY_VERIFIED: 'التدقيق المالي', APPROVED: 'الاعتماد النهائي', COMPLETED: 'تأكيد التحويل' };
+    if (!confirm(`هل تريد تغيير الحالة إلى "${labels[newStatus]}"؟`)) return;
+    try {
+      const res = await fetch('/api/withdrawals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          _id: requestId,
+          status: newStatus,
+          role: session.role_name,
+          user_id: session.user_id,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم تحديث الحالة بنجاح!');
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت العملية');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
+
+  const handleCancelWithdrawal = async (requestId) => {
+    if (!confirm('هل تريد إلغاء هذا الطلب؟')) return;
+    try {
+      const res = await fetch('/api/withdrawals', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ _id: requestId, role: session.role_name, user_id: session.user_id }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم الإلغاء');
+        setSelectedWithdrawal(null);
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت العملية');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
+
+  const withdrawStatusLabel = (s) => {
+    const map = { PENDING: 'جديد', FINANCIALLY_VERIFIED: 'قيد المراجعة المالية', APPROVED: 'معتمد', COMPLETED: 'تم التحويل' };
+    return map[s] || s;
+  };
+  const withdrawStatusColor = (s) => {
+    const map = { PENDING: 'var(--info)', FINANCIALLY_VERIFIED: 'var(--warning)', APPROVED: 'var(--success)', COMPLETED: 'var(--text-muted)' };
+    return map[s] || 'var(--text-muted)';
+  };
+
+  const myOwner = owners.find(o => o.user_id === session.user_id);
+  const myDists = distributions.filter(d => d.owner_id === (myOwner?.owner_id));
+  const totalDistributed = myDists.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  const totalWithdrawn = withdrawals
+    .filter(w => w.status === 'COMPLETED' || w.status === 'APPROVED' || w.status === 'FINANCIALLY_VERIFIED' || w.status === 'PENDING')
+    .reduce((s, w) => s + (Number(w.amount) || 0), 0);
+  const availableBalance = totalDistributed - totalWithdrawn;
 
   const handleCreateVote = async (e) => {
     e.preventDefault();
@@ -477,6 +582,15 @@ export default function OwnersModule({ session }) {
             onClick={() => setActiveTab('new-vote')}
           >
             ➕ طرح مبادرة للتصويت
+          </button>
+        )}
+        {(isOwner || isCEO) && (
+          <button
+            id="tab-own-withdrawals"
+            className={`btn ${activeTab === 'withdrawals' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('withdrawals')}
+          >
+            💸 سحب الأرباح
           </button>
         )}
       </div>
@@ -951,6 +1065,187 @@ export default function OwnersModule({ session }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* === WITHDRAWALS TAB === */}
+      {activeTab === 'withdrawals' && (
+        <div>
+          {/* Balance Banner */}
+          <div style={{
+            padding: '20px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-accent)', marginBottom: '20px',
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px'
+          }}>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الأرباح الموزعة لك</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>{formatCurrency(totalDistributed)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي المسحوب</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--danger)', marginTop: '4px' }}>{formatCurrency(totalWithdrawn)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الرصيد المتاح للسحب</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>{formatCurrency(availableBalance)}</div>
+            </div>
+          </div>
+
+          <div className="grid-cols-2-1">
+            {/* Withdrawal List */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title">طلبات السحب ({withdrawals.length})</h2>
+              </div>
+              {withdrawals.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد طلبات سحب</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px' }}>
+                  {withdrawals.map(w => {
+                    const owner = owners.find(o => o.owner_id === w.owner_id);
+                    return (
+                      <div
+                        key={w.request_id}
+                        onClick={() => setSelectedWithdrawal(w)}
+                        style={{
+                          padding: '14px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                          background: selectedWithdrawal?.request_id === w.request_id ? 'var(--bg-card-hover)' : 'var(--bg-secondary)',
+                          border: `1px solid ${selectedWithdrawal?.request_id === w.request_id ? 'var(--border-accent)' : 'var(--border-primary)'}`,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '14px' }}>{owner?.name || `مالك #${w.owner_id}`}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{new Date(w.created_at).toLocaleDateString('ar-SA')}</div>
+                          </div>
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--danger)' }}>{formatCurrency(w.amount)}</div>
+                            <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, color: withdrawStatusColor(w.status), background: `${withdrawStatusColor(w.status)}15` }}>
+                              {withdrawStatusLabel(w.status)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Details / Actions */}
+            <div>
+              {/* Create new withdrawal (Owner only) */}
+              {isOwner && availableBalance > 0 && (
+                <div className="card" style={{ marginBottom: '16px' }}>
+                  <div className="card-header">
+                    <h2 className="card-title">💸 طلب سحب جديد</h2>
+                  </div>
+                  <form onSubmit={handleCreateWithdrawal} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 16px 16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">المبلغ المطلوب سحبه (MRU) — المتاح: {formatCurrency(availableBalance)}</label>
+                      <input type="number" className="form-input" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="0" required min="1" max={availableBalance} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">وسيلة السحب</label>
+                      <select className="form-select" value={withdrawMethod} onChange={e => setWithdrawMethod(e.target.value)}>
+                        <option value="تحويل بنكي">تحويل بنكي</option>
+                        <option value="بنكيلي">بنكيلي</option>
+                        <option value="محفظة إلكترونية">محفظة إلكترونية</option>
+                        <option value="كاش">كاش</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">ملاحظات</label>
+                      <input type="text" className="form-input" value={withdrawNotes} onChange={e => setWithdrawNotes(e.target.value)} placeholder="رقم الحساب أو أي ملاحظات..." />
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>إرسال طلب السحب</button>
+                  </form>
+                </div>
+              )}
+
+              {/* Selected withdrawal details */}
+              {selectedWithdrawal && (
+                <div className="card">
+                  <div className="card-header">
+                    <h2 className="card-title">تفاصيل الطلب #{selectedWithdrawal.request_id}</h2>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '0 16px 16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <div className="form-label">المبلغ</div>
+                        <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--danger)' }}>{formatCurrency(selectedWithdrawal.amount)}</div>
+                      </div>
+                      <div>
+                        <div className="form-label">الحالة</div>
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, color: withdrawStatusColor(selectedWithdrawal.status), background: `${withdrawStatusColor(selectedWithdrawal.status)}15` }}>
+                          {withdrawStatusLabel(selectedWithdrawal.status)}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="form-label">وسيلة السحب</div>
+                        <div>{selectedWithdrawal.payment_method}</div>
+                      </div>
+                      <div>
+                        <div className="form-label">تاريخ الطلب</div>
+                        <div>{new Date(selectedWithdrawal.created_at).toLocaleDateString('ar-SA')}</div>
+                      </div>
+                    </div>
+
+                    {selectedWithdrawal.notes && (
+                      <div>
+                        <div className="form-label">ملاحظات</div>
+                        <div style={{ fontSize: '13px' }}>{selectedWithdrawal.notes}</div>
+                      </div>
+                    )}
+
+                    {/* Workflow Progress */}
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', margin: '8px 0' }}>
+                      {['PENDING', 'FINANCIALLY_VERIFIED', 'APPROVED', 'COMPLETED'].map((s, i) => {
+                        const statusOrder = ['PENDING', 'FINANCIALLY_VERIFIED', 'APPROVED', 'COMPLETED'];
+                        const currentIdx = statusOrder.indexOf(selectedWithdrawal.status);
+                        const isActive = i <= currentIdx;
+                        return (
+                          <div key={s} style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{ height: '6px', borderRadius: '3px', background: isActive ? withdrawStatusColor(s) : 'var(--border-primary)', marginBottom: '4px' }} />
+                            <div style={{ fontSize: '9px', color: isActive ? withdrawStatusColor(s) : 'var(--text-muted)', fontWeight: isActive ? 700 : 400 }}>
+                              {withdrawStatusLabel(s)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="divider" style={{ margin: '4px 0' }} />
+
+                    {/* Action Buttons based on role */}
+                    {isCEO && selectedWithdrawal.status === 'FINANCIALLY_VERIFIED' && (
+                      <button className="btn btn-primary" onClick={() => handleUpdateWithdrawalStatus(selectedWithdrawal.request_id, 'APPROVED')}>
+                        ✅ اعتماد وموافقة نهائية
+                      </button>
+                    )}
+
+                    {canManage && selectedWithdrawal.status === 'APPROVED' && (
+                      <button className="btn btn-primary" onClick={() => handleUpdateWithdrawalStatus(selectedWithdrawal.request_id, 'COMPLETED')}>
+                        💰 تأكيد التحويل للمالك
+                      </button>
+                    )}
+
+                    {canManage && selectedWithdrawal.status === 'PENDING' && (
+                      <button className="btn btn-secondary" onClick={() => handleUpdateWithdrawalStatus(selectedWithdrawal.request_id, 'FINANCIALLY_VERIFIED')}>
+                        📋 تدقيق مالي
+                      </button>
+                    )}
+
+                    {(isOwner && selectedWithdrawal.status === 'PENDING') || (isCEO) ? (
+                      <button className="btn btn-danger btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => handleCancelWithdrawal(selectedWithdrawal.request_id)}>
+                        🗑️ إلغاء الطلب
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
