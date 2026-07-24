@@ -62,7 +62,25 @@ export default function UsersModule({ session }) {
 
       const result = await res.json();
       if (result.success) {
-        alert('تم إنشاء حساب المستخدم والارتباط بنجاح!');
+        const newUser = result.data;
+        // Auto-create employee record with real name and email
+        try {
+          await fetch('/api/data/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: newUser.user_id,
+              name: name,
+              email: email,
+              job_title: 'موظف',
+              department_id: 1,
+              salary: 0,
+              employment_status: 'active',
+              _userId: session.user_id,
+            }),
+          });
+        } catch { /* ignore employee creation errors */ }
+        alert('تم إنشاء حساب المستخدم وإضافته كموظف تلقائياً!');
         setName('');
         setEmail('');
         setPassword('');
