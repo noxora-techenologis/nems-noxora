@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 
 export default function HRDashboard() {
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -50,7 +52,7 @@ export default function HRDashboard() {
           <p className="page-subtitle">إدارة الموظفين والحضور والإجازات</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button id="add-employee-btn" className="btn btn-primary btn-sm">➕ موظف جديد</button>
+          <button id="add-employee-btn" className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/hr/employees')}>➕ موظف جديد</button>
         </div>
       </div>
 
@@ -83,7 +85,7 @@ export default function HRDashboard() {
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">👤 قائمة الموظفين</h2>
-            <button id="view-all-emp-btn" className="btn btn-ghost btn-sm">الكل →</button>
+            <button id="view-all-emp-btn" className="btn btn-ghost btn-sm" onClick={() => router.push('/dashboard/hr/employees')}>الكل →</button>
           </div>
           <div className="table-wrapper">
             <table>
@@ -146,6 +148,7 @@ export default function HRDashboard() {
                       id={`approve-leave-${l.leave_id}`}
                       className="btn btn-sm"
                       style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid rgba(39,174,96,0.3)', flex: 1 }}
+                      onClick={() => router.push('/dashboard/hr/attendance')}
                     >
                       ✅ موافقة
                     </button>
@@ -153,6 +156,7 @@ export default function HRDashboard() {
                       id={`reject-leave-${l.leave_id}`}
                       className="btn btn-sm"
                       style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(231,76,60,0.3)', flex: 1 }}
+                      onClick={() => router.push('/dashboard/hr/attendance')}
                     >
                       ❌ رفض
                     </button>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import DashboardLayout from '@/components/DashboardLayout';
 
@@ -19,6 +20,7 @@ const PRIORITY_LABELS = {
 };
 
 export default function CEODashboard() {
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [, setCurrTick] = useState(0);
@@ -62,7 +64,7 @@ export default function CEODashboard() {
           <button id="ceo-refresh-btn" className="btn btn-secondary btn-sm" onClick={() => window.location.reload()}>
             🔄 تحديث
           </button>
-          <button id="ceo-report-btn" className="btn btn-primary btn-sm">
+          <button id="ceo-report-btn" className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/ceo/reports')}>
             📊 تقرير شامل
           </button>
         </div>
@@ -132,7 +134,7 @@ export default function CEODashboard() {
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">📂 المشاريع الجارية</h2>
-            <button id="view-all-projects-btn" className="btn btn-ghost btn-sm">عرض الكل →</button>
+            <button id="view-all-projects-btn" className="btn btn-ghost btn-sm" onClick={() => router.push('/dashboard/ceo/projects')}>عرض الكل →</button>
           </div>
           <div className="table-wrapper">
             <table>

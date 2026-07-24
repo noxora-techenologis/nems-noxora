@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import DashboardLayout from '@/components/DashboardLayout';
 
 export default function FMDashboard() {
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [, setCurrTick] = useState(0);
@@ -63,8 +65,8 @@ export default function FMDashboard() {
           <p className="page-subtitle">إدارة الإيرادات والمصروفات والرواتب</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button id="fm-add-revenue-btn" className="btn btn-secondary btn-sm">➕ إيراد جديد</button>
-          <button id="fm-add-expense-btn" className="btn btn-primary btn-sm">➕ مصروف جديد</button>
+          <button id="fm-add-revenue-btn" className="btn btn-secondary btn-sm" onClick={() => router.push('/dashboard/fm/finance')}>➕ إيراد جديد</button>
+          <button id="fm-add-expense-btn" className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/fm/finance')}>➕ مصروف جديد</button>
         </div>
       </div>
 
@@ -212,8 +214,8 @@ export default function FMDashboard() {
               </div>
               <div style={{ fontWeight: 800, color: 'var(--warning)', fontSize: '16px' }}>{formatCurrency(d.amount)}</div>
               <div style={{ display: 'flex', gap: '6px' }}>
-                <button id={`approve-ded-${d.deduction_id}`} className="btn btn-sm" style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid rgba(39,174,96,0.3)' }}>✅</button>
-                <button id={`reject-ded-${d.deduction_id}`} className="btn btn-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(231,76,60,0.3)' }}>❌</button>
+                <button id={`approve-ded-${d.deduction_id}`} className="btn btn-sm" style={{ background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid rgba(39,174,96,0.3)' }} onClick={() => router.push('/dashboard/fm/finance')}>✅</button>
+                <button id={`reject-ded-${d.deduction_id}`} className="btn btn-sm" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(231,76,60,0.3)' }} onClick={() => router.push('/dashboard/fm/finance')}>❌</button>
               </div>
             </div>
           ))}

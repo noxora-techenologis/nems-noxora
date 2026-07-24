@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,18 +54,20 @@ export default function AdminDashboard() {
           <p className="page-subtitle">صلاحيات كاملة على المستخدمين والنظام والسجلات</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button id="admin-add-user-btn" className="btn btn-primary btn-sm">➕ مستخدم جديد</button>
+          <button id="admin-add-user-btn" className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/admin/users')}>
+            ➕ مستخدم جديد
+          </button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="stats-grid">
-        <div className="stat-card">
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => router.push('/dashboard/admin/users')}>
           <div className="stat-icon blue">👤</div>
           <div className="stat-value">{users.length}</div>
           <div className="stat-label">إجمالي المستخدمين</div>
         </div>
-        <div className="stat-card green">
+        <div className="stat-card green" style={{ cursor: 'pointer' }} onClick={() => router.push('/dashboard/admin/users')}>
           <div className="stat-icon green">✅</div>
           <div className="stat-value">{activeUsers.length}</div>
           <div className="stat-label">مستخدمون نشطون</div>
@@ -73,7 +77,7 @@ export default function AdminDashboard() {
           <div className="stat-value">{roles.length}</div>
           <div className="stat-label">الأدوار المعرفة</div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => router.push('/dashboard/admin/logs')}>
           <div className="stat-icon purple">📋</div>
           <div className="stat-value">{auditLog.length}</div>
           <div className="stat-label">إجراءات مسجلة</div>
@@ -86,7 +90,9 @@ export default function AdminDashboard() {
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">👤 إدارة المستخدمين</h2>
-              <button id="admin-view-all-users" className="btn btn-ghost btn-sm">الكل →</button>
+              <button id="admin-view-all-users" className="btn btn-ghost btn-sm" onClick={() => router.push('/dashboard/admin/users')}>
+                الكل →
+              </button>
             </div>
             <div className="table-wrapper">
               <table>
@@ -123,8 +129,12 @@ export default function AdminDashboard() {
                         </span></td>
                         <td>
                           <div style={{ display: 'flex', gap: '4px' }}>
-                            <button id={`edit-user-${u.user_id}`} className="btn btn-icon btn-ghost btn-sm" title="تعديل">✏️</button>
-                            <button id={`toggle-user-${u.user_id}`} className="btn btn-icon btn-ghost btn-sm" title="تبديل الحالة">🔄</button>
+                            <button id={`edit-user-${u.user_id}`} className="btn btn-icon btn-ghost btn-sm" title="تعديل" onClick={() => router.push('/dashboard/admin/users')}>
+                              ✏️
+                            </button>
+                            <button id={`toggle-user-${u.user_id}`} className="btn btn-icon btn-ghost btn-sm" title="تبديل الحالة" onClick={() => router.push('/dashboard/admin/users')}>
+                              🔄
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -139,7 +149,9 @@ export default function AdminDashboard() {
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">⚙️ إعدادات النظام</h2>
-              <button id="admin-settings-btn" className="btn btn-secondary btn-sm">تعديل</button>
+              <button id="admin-settings-btn" className="btn btn-secondary btn-sm" onClick={() => router.push('/dashboard/admin/settings')}>
+                تعديل
+              </button>
             </div>
             <div className="table-wrapper">
               <table>
@@ -162,6 +174,9 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">📋 سجل النشاط</h2>
+            <button className="btn btn-ghost btn-sm" onClick={() => router.push('/dashboard/admin/logs')}>
+              الكل →
+            </button>
           </div>
           <div className="timeline">
             {auditLog.map(log => (

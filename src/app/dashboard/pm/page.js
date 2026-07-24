@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 
 export default function PMDashboard() {
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,8 +50,8 @@ export default function PMDashboard() {
           <p className="page-subtitle">إدارة المشاريع والمهام والاجتماعات</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button id="pm-add-task-btn" className="btn btn-secondary btn-sm">➕ مهمة</button>
-          <button id="pm-add-project-btn" className="btn btn-primary btn-sm">➕ مشروع جديد</button>
+          <button id="pm-add-task-btn" className="btn btn-secondary btn-sm" onClick={() => router.push('/dashboard/pm/projects')}>➕ مهمة</button>
+          <button id="pm-add-project-btn" className="btn btn-primary btn-sm" onClick={() => router.push('/dashboard/pm/projects')}>➕ مشروع جديد</button>
         </div>
       </div>
 
