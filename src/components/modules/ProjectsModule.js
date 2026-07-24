@@ -61,6 +61,16 @@ export default function ProjectsModule({ session }) {
 
   const isEmployee = session.role_name.toLowerCase() === 'employee';
   const canManage = ['admin', 'ceo', 'pm'].includes(session.role_name.toLowerCase());
+  const canCreateProject = session.role_name.toLowerCase() === 'ceo';
+
+  // New project form state
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [projName, setProjName] = useState('');
+  const [projDesc, setProjDesc] = useState('');
+  const [projPriority, setProjPriority] = useState('medium');
+  const [projBudget, setProjBudget] = useState('');
+  const [projStartDate, setProjStartDate] = useState('');
+  const [projEndDate, setProjEndDate] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -91,6 +101,50 @@ export default function ProjectsModule({ session }) {
   const handleSelectProject = (proj) => {
     setSelectedProj(proj);
     setShowTaskForm(false);
+    setShowProjectForm(false);
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    if (!projName) {
+      alert('يرجى إدخال اسم المشروع');
+      return;
+    }
+    try {
+      const res = await fetch('/api/data/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: projName,
+          description: projDesc,
+          priority: projPriority,
+          budget: Number(projBudget) || 0,
+          start_date: projStartDate || null,
+          end_date: projEndDate || null,
+          status: 'planning',
+          progress: 0,
+          currency: 'MRU',
+          health_score: 100,
+          _userId: session.user_id,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم إنشاء المشروع بنجاح!');
+        setProjName('');
+        setProjDesc('');
+        setProjPriority('medium');
+        setProjBudget('');
+        setProjStartDate('');
+        setProjEndDate('');
+        setShowProjectForm(false);
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت عملية الإضافة');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    }
   };
 
   const handleCreateTask = async (e) => {
@@ -264,8 +318,78 @@ export default function ProjectsModule({ session }) {
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">سير المشاريع القائمة</h2>
-            <span className="badge badge-muted">المجموع: {projects.length} مشاريع</span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span className="badge badge-muted">المجموع: {projects.length} مشاريع</span>
+              {canCreateProject && (
+                <button
+                  id="add-project-btn"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => { setShowProjectForm(!showProjectForm); setShowTaskForm(false); setSelectedProj(null); }}
+                >
+                  {showProjectForm ? '✕ إلغاء' : '➕ مشروع جديد'}
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Project Creation Form (CEO only) */}
+          {showProjectForm && canCreateProject && (
+            <div style={{ padding: '16px', borderBottom: '1px solid var(--border-primary)', background: 'rgba(192,57,43,0.04)' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '12px', color: 'var(--noxora-red)' }}>➕ إنشاء مشروع جديد</h3>
+              <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">اسم المشروع *</label>
+                  <input
+                    id="new-proj-name"
+                    type="text"
+                    className="form-input"
+                    value={projName}
+                    onChange={e => setProjName(e.target.value)}
+                    required
+                    placeholder="مثال: تطوير تطبيق NEMS"
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">وصف المشروع</label>
+                  <textarea
+                    id="new-proj-desc"
+                    className="form-textarea"
+                    value={projDesc}
+                    onChange={e => setProjDesc(e.target.value)}
+                    placeholder="وصف مختصر لأهداف المشروع..."
+                    style={{ minHeight: '60px' }}
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">الأولوية</label>
+                    <select id="new-proj-priority" className="form-select" value={projPriority} onChange={e => setProjPriority(e.target.value)}>
+                      <option value="low">منخفضة</option>
+                      <option value="medium">متوسطة</option>
+                      <option value="high">عالية</option>
+                      <option value="critical">حرجة</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">الميزانية (MRU)</label>
+                    <input id="new-proj-budget" type="number" className="form-input" value={projBudget} onChange={e => setProjBudget(e.target.value)} placeholder="0" min="0" />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">تاريخ البداية</label>
+                    <input id="new-proj-start" type="date" className="form-input" value={projStartDate} onChange={e => setProjStartDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">تاريخ النهاية</label>
+                    <input id="new-proj-end" type="date" className="form-input" value={projEndDate} onChange={e => setProjEndDate(e.target.value)} />
+                  </div>
+                </div>
+                <button id="submit-project-btn" type="submit" className="btn btn-primary btn-sm w-full">🚀 إنشاء المشروع</button>
+              </form>
+            </div>
+          )}
+
           <div className="table-wrapper">
             <table>
               <thead>
