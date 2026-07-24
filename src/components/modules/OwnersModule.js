@@ -49,7 +49,6 @@ export default function OwnersModule({ session }) {
 
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
-  const canApprove = isCEO || session.role_name.toLowerCase() === 'admin';
 
   useEffect(() => {
     fetchData();
@@ -635,7 +634,7 @@ export default function OwnersModule({ session }) {
                         <span className={`badge ${txn.status === 'completed' ? 'badge-success' : txn.status === 'pending' ? 'badge-warning' : 'badge-danger'}`}>
                           {txn.status === 'completed' ? '✅ مكتملة' : txn.status === 'pending' ? '⏳ معلقة' : '❌ مرفوضة'}
                         </span>
-                        {canApprove && txn.status === 'pending' && (
+                        {isCEO && txn.status === 'pending' && (
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button
                               id={`approve-txn-${txn.transaction_id}`}
@@ -794,7 +793,7 @@ export default function OwnersModule({ session }) {
                       </p>
 
                       {/* CEO Approvals */}
-                      {canApprove && req.status === 'pending' && (
+                      {isCEO && req.status === 'pending' && (
                         <div style={{ display: 'flex', gap: '8px', marginTop: '6px', justifyContent: 'flex-end' }}>
                           <button
                             id={`approve-pos-${req.request_id}`}
