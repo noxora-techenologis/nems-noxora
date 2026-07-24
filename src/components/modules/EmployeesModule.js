@@ -26,6 +26,7 @@ export default function EmployeesModule({ session }) {
   const [basicSalary, setBasicSalary] = useState('');
   const [allowances, setAllowances] = useState('');
   const [empStatus, setEmpStatus] = useState('active');
+  const [deptId, setDeptId] = useState('');
 
   const canManage = session.role_name.toLowerCase() === 'ceo';
 
@@ -57,6 +58,7 @@ export default function EmployeesModule({ session }) {
     setBasicSalary(emp.basic_salary || '');
     setAllowances(emp.allowances || '');
     setEmpStatus(emp.employment_status || 'active');
+    setDeptId(emp.department_id || '');
     setEditing(false);
   };
 
@@ -72,6 +74,7 @@ export default function EmployeesModule({ session }) {
           _id: selectedEmp.employee_id,
           _userId: session.user_id,
           job_title: jobTitle,
+          department_id: Number(deptId),
           basic_salary: Number(basicSalary),
           allowances: Number(allowances),
           employment_status: empStatus,
@@ -83,10 +86,10 @@ export default function EmployeesModule({ session }) {
         // Update local state
         setEmployees(employees.map(emp =>
           emp.employee_id === selectedEmp.employee_id
-            ? { ...emp, job_title: jobTitle, basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus }
+            ? { ...emp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus }
             : emp
         ));
-        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus });
+        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus });
         setEditing(false);
         alert('تم حفظ التعديلات بنجاح!');
       } else {
@@ -276,6 +279,21 @@ export default function EmployeesModule({ session }) {
                       onChange={e => setJobTitle(e.target.value)}
                       required
                     />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">القسم</label>
+                    <select
+                      id="edit-emp-dept"
+                      className="form-select"
+                      value={deptId}
+                      onChange={e => setDeptId(e.target.value)}
+                      required
+                    >
+                      <option value="">اختر القسم</option>
+                      {departments.map(d => (
+                        <option key={d.department_id} value={d.department_id}>{d.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">الراتب الأساسي</label>
