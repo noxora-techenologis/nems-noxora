@@ -27,7 +27,7 @@ export default function EmployeesModule({ session }) {
   const [allowances, setAllowances] = useState('');
   const [empStatus, setEmpStatus] = useState('active');
 
-  const canManage = ['admin', 'ceo', 'hr'].includes(session.role_name.toLowerCase());
+  const canManage = session.role_name.toLowerCase() === 'ceo';
 
   useEffect(() => {
     fetchData();
