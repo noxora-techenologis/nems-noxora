@@ -98,6 +98,7 @@ export default function EmployeesModule({ session }) {
   };
 
   const filtered = employees.filter(emp =>
+    (emp.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (emp.job_title || '').toLowerCase().includes(search.toLowerCase()) ||
     (emp.employee_id || '').toLowerCase().includes(search.toLowerCase()) ||
     (emp.nationality || '').toLowerCase().includes(search.toLowerCase())
@@ -131,7 +132,7 @@ export default function EmployeesModule({ session }) {
             <div style={{ width: '220px' }}>
               <input
                 type="text"
-                placeholder="بحث في المسمى أو الرقم..."
+                placeholder="بحث بالاسم أو المسمى..."
                 className="form-input"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -144,10 +145,9 @@ export default function EmployeesModule({ session }) {
             <table>
               <thead>
                 <tr>
-                  <th>الرقم الوظيفي</th>
+                  <th>الاسم</th>
                   <th>المسمى الوظيفي</th>
                   <th>القسم</th>
-                  <th>الهوية الوطنية</th>
                   <th>الحالة</th>
                 </tr>
               </thead>
@@ -161,10 +161,9 @@ export default function EmployeesModule({ session }) {
                       style={{ cursor: 'pointer', background: selectedEmp?.employee_id === emp.employee_id ? 'var(--bg-card-hover)' : '' }}
                       id={`emp-row-${emp.employee_id}`}
                     >
-                      <td style={{ fontWeight: 700 }}>{emp.employee_id}</td>
-                      <td>{emp.job_title}</td>
+                      <td style={{ fontWeight: 700 }}>{emp.name || 'غير محدد'}</td>
+                      <td>{emp.job_title || 'غير محدد'}</td>
                       <td>{dept?.name || 'غير محدد'}</td>
-                      <td style={{ color: 'var(--text-secondary)' }}>{emp.national_id}</td>
                       <td>
                         <span className={`badge ${emp.employment_status === 'active' ? 'badge-success' : 'badge-danger'}`}>
                           {emp.employment_status === 'active' ? 'نشط' : 'غير نشط'}
@@ -200,11 +199,12 @@ export default function EmployeesModule({ session }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                     <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '18px' }}>
-                      {selectedEmp.job_title?.[0] || 'N'}
+                      {selectedEmp.name?.[0] || 'N'}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '16px' }}>{selectedEmp.job_title}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>رقم: {selectedEmp.employee_id}</div>
+                      <div style={{ fontWeight: 800, fontSize: '16px' }}>{selectedEmp.name || 'غير محدد'}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{selectedEmp.job_title} | رقم: {selectedEmp.employee_id}</div>
+                      {selectedEmp.email && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{selectedEmp.email}</div>}
                     </div>
                   </div>
 
@@ -331,8 +331,8 @@ export default function EmployeesModule({ session }) {
         <UserProfileModal
           user={{
             user_id: selectedEmp.user_id,
-            name: selectedEmp.job_title,
-            email: `emp${selectedEmp.user_id}@noxora.com`,
+            name: selectedEmp.name || selectedEmp.job_title,
+            email: selectedEmp.email || '',
             phone: selectedEmp.emergency_contact,
             role_name: 'Employee',
             employee_id: selectedEmp.employee_id,
