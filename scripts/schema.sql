@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS employees (
   emergency_name VARCHAR(150),
   emergency_relation VARCHAR(50),
   epi_score INT DEFAULT 0,
+  salary_type VARCHAR(20) DEFAULT 'monthly',
+  hourly_rate DECIMAL(10,2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP
 );
@@ -97,6 +99,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   required_proof VARCHAR(30) DEFAULT 'none',
   attached_media JSONB,
   proof_submitted JSONB,
+  deduction_value DECIMAL(15,2) DEFAULT 0,
+  completed_at TIMESTAMP,
+  is_delayed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP
 );
@@ -112,6 +117,8 @@ CREATE TABLE IF NOT EXISTS attendance (
   total_hours DECIMAL(5,2) DEFAULT 0,
   overtime_hours DECIMAL(5,2) DEFAULT 0,
   is_late BOOLEAN DEFAULT FALSE,
+  absent_hours DECIMAL(5,2) DEFAULT 0,
+  confirmed_slots INT DEFAULT 0,
   notes TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP
@@ -159,6 +166,12 @@ CREATE TABLE IF NOT EXISTS salaries (
   currency VARCHAR(10) DEFAULT 'MRU',
   status VARCHAR(20) DEFAULT 'pending',
   payment_status VARCHAR(20) DEFAULT 'pending',
+  hours_worked DECIMAL(8,2) DEFAULT 0,
+  absent_hours DECIMAL(8,2) DEFAULT 0,
+  hourly_rate DECIMAL(10,2) DEFAULT 0,
+  task_deductions DECIMAL(15,2) DEFAULT 0,
+  attendance_deductions DECIMAL(15,2) DEFAULT 0,
+  gross_salary DECIMAL(15,2) DEFAULT 0,
   paid_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP

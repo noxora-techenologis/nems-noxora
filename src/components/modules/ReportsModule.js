@@ -10,7 +10,20 @@ export default function ReportsModule({ session }) {
   const [revenues, setRevenues] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [salaries, setSalaries] = useState([]);
+  const [payrollData, setPayrollData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().substring(0, 7));
+  const [, setCurrTick] = useState(0);
+
+  useEffect(() => {
+    const handleCurrChange = () => setCurrTick(t => t + 1);
+    window.addEventListener('currency-change', handleCurrChange);
+    return () => window.removeEventListener('currency-change', handleCurrChange);
+  }, []);
+
+  const isCEO = ['ceo', 'admin'].includes(session.role_name?.toLowerCase());
+  const isFM = session.role_name?.toLowerCase() === 'fm';
 
   useEffect(() => {
     Promise.all([
@@ -30,6 +43,43 @@ export default function ReportsModule({ session }) {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  const fetchPayroll = async () => {
+    try {
+      const res = await fetch(`/api/payroll?month=${selectedMonth}`);
+      const data = await res.json();
+      setPayrollData(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading) fetchPayroll();
+  }, [loading, selectedMonth]);
+
+  const handleGeneratePayroll = async () => {
+    if (!confirm(`هل تريد إنشاء/تحديث سجلات الرواتب لشهر ${selectedMonth}؟`)) return;
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month: selectedMonth, _userId: session.user_id }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert(result.message);
+        fetchPayroll();
+      } else {
+        alert(result.error || 'فشلت العملية');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -173,6 +223,94 @@ export default function ReportsModule({ session }) {
           </div>
         </div>
       </div>
+
+      {/* Payroll Generation Section (CEO/FM only) */}
+      {(isCEO || isFM) && (
+        <div className="card" style={{ marginTop: '20px', border: '2px solid var(--border-accent)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 className="card-title" style={{ margin: 0 }}>💰 توليد كشوف الرواتب الشهرية</h2>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="month"
+                className="form-input"
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                style={{ width: '180px' }}
+              />
+              <button
+                id="generate-payroll-btn"
+                className="btn btn-primary"
+                onClick={handleGeneratePayroll}
+                disabled={generating}
+              >
+                {generating ? '⏳ جاري التوليد...' : '🚀 توليد كشوف الرواتب'}
+              </button>
+            </div>
+          </div>
+
+          {payrollData && payrollData.employees && (
+            <div>
+              <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '16px' }}>
+                <div className="stat-card">
+                  <div className="stat-value" style={{ fontSize: '16px' }}>{payrollData.totals?.employee_count || 0}</div>
+                  <div className="stat-label">الموظفون النشطون</div>
+                </div>
+                <div className="stat-card green">
+                  <div className="stat-value" style={{ fontSize: '16px' }}>{formatCurrency(payrollData.totals?.total_gross || 0)}</div>
+                  <div className="stat-label">إجمالي الرواتب قبل الخصومات</div>
+                </div>
+                <div className="stat-card red">
+                  <div className="stat-value" style={{ fontSize: '16px' }}>-{formatCurrency(payrollData.totals?.total_deductions || 0)}</div>
+                  <div className="stat-label">إجمالي الخصومات</div>
+                </div>
+                <div className="stat-card green">
+                  <div className="stat-value" style={{ fontSize: '16px' }}>{formatCurrency(payrollData.totals?.total_net || 0)}</div>
+                  <div className="stat-label">صافي الرواتب المستحقة</div>
+                </div>
+              </div>
+
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>الموظف</th>
+                      <th>النوع</th>
+                      <th>ساعات العمل</th>
+                      <th>الغياب</th>
+                      <th>المنجز</th>
+                      <th>غير المنجز</th>
+                      <th>الراتب الإجمالي</th>
+                      <th>خصم الحضور</th>
+                      <th>خصم المهام</th>
+                      <th>الصافي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrollData.employees.map(emp => (
+                      <tr key={emp.employee_id} id={`payroll-row-${emp.employee_id}`}>
+                        <td style={{ fontWeight: 700 }}>{emp.employee_name}</td>
+                        <td>
+                          <span className={`badge ${emp.salary_type === 'hourly' ? 'badge-warning' : 'badge-info'}`}>
+                            {emp.salary_type === 'hourly' ? `⏰ ${emp.hourly_rate} MRU/ساعة` : '📅 شهري'}
+                          </span>
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--success)' }}>{emp.total_hours_worked}</td>
+                        <td style={{ fontWeight: 700, color: emp.total_absent_hours > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>{emp.total_absent_hours}</td>
+                        <td><span className="badge badge-success">{emp.completed_tasks}</span></td>
+                        <td><span className={`badge ${emp.uncompleted_tasks > 0 ? 'badge-danger' : 'badge-muted'}`}>{emp.uncompleted_tasks}</span></td>
+                        <td style={{ fontWeight: 700 }}>{formatCurrency(emp.gross_salary)}</td>
+                        <td style={{ color: 'var(--danger)' }}>-{formatCurrency(emp.attendance_deductions)}</td>
+                        <td style={{ color: 'var(--danger)' }}>-{formatCurrency(emp.task_deductions)}</td>
+                        <td style={{ fontWeight: 900, color: 'var(--success)' }}>{formatCurrency(emp.net_salary)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Salaries Table - printable */}
       {salaries.length > 0 && (

@@ -27,6 +27,8 @@ export default function EmployeesModule({ session }) {
   const [allowances, setAllowances] = useState('');
   const [empStatus, setEmpStatus] = useState('active');
   const [deptId, setDeptId] = useState('');
+  const [salaryType, setSalaryType] = useState('monthly');
+  const [hourlyRate, setHourlyRate] = useState('');
 
   const canManage = session.role_name.toLowerCase() === 'ceo';
 
@@ -59,6 +61,8 @@ export default function EmployeesModule({ session }) {
     setAllowances(emp.allowances || '');
     setEmpStatus(emp.employment_status || 'active');
     setDeptId(emp.department_id || '');
+    setSalaryType(emp.salary_type || 'monthly');
+    setHourlyRate(emp.hourly_rate || '');
     setEditing(false);
   };
 
@@ -78,6 +82,8 @@ export default function EmployeesModule({ session }) {
           basic_salary: Number(basicSalary),
           allowances: Number(allowances),
           employment_status: empStatus,
+          salary_type: salaryType,
+          hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0,
         }),
       });
 
@@ -86,10 +92,10 @@ export default function EmployeesModule({ session }) {
         // Update local state
         setEmployees(employees.map(emp =>
           emp.employee_id === selectedEmp.employee_id
-            ? { ...emp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus }
+            ? { ...emp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 }
             : emp
         ));
-        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus });
+        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 });
         setEditing(false);
         alert('تم حفظ التعديلات بنجاح!');
       } else {
@@ -223,6 +229,18 @@ export default function EmployeesModule({ session }) {
                       <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--success)' }}>+{formatCurrency(selectedEmp.allowances)}</div>
                     </div>
                     <div>
+                      <div className="form-label">نوع الراتب</div>
+                      <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                        {selectedEmp.salary_type === 'hourly' ? '⏰ بالساعة' : '📅 شهري ثابت'}
+                      </div>
+                    </div>
+                    {selectedEmp.salary_type === 'hourly' && (
+                      <div>
+                        <div className="form-label">سعر الساعة</div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--noxora-yellow-light)' }}>{formatCurrency(selectedEmp.hourly_rate)}/ساعة</div>
+                      </div>
+                    )}
+                    <div>
                       <div className="form-label">تاريخ التعيين</div>
                       <div>{selectedEmp.hire_date}</div>
                     </div>
@@ -296,7 +314,34 @@ export default function EmployeesModule({ session }) {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">الراتب الأساسي</label>
+                    <label className="form-label">نوع الراتب</label>
+                    <select
+                      id="edit-emp-salary-type"
+                      className="form-select"
+                      value={salaryType}
+                      onChange={e => setSalaryType(e.target.value)}
+                    >
+                      <option value="monthly">📅 شهري ثابت</option>
+                      <option value="hourly">⏰ بالساعة (حساب تلقائي)</option>
+                    </select>
+                  </div>
+                  {salaryType === 'hourly' && (
+                    <div className="form-group">
+                      <label className="form-label">سعر الساعة (MRU)</label>
+                      <input
+                        id="edit-emp-hourly-rate"
+                        type="number"
+                        className="form-input"
+                        value={hourlyRate}
+                        onChange={e => setHourlyRate(e.target.value)}
+                        placeholder="مثال: 30"
+                        min="0"
+                        step="0.5"
+                      />
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label className="form-label">{salaryType === 'hourly' ? 'الحد الأقصى للساعات الشهرية' : 'الراتب الأساسي'}</label>
                     <input
                       id="edit-emp-basic-salary"
                       type="number"

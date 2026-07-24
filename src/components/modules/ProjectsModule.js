@@ -46,6 +46,7 @@ export default function ProjectsModule({ session }) {
   const [assignedTo, setAssignedTo] = useState('');
   const [deadline, setDeadline] = useState('');
   const [requiredProof, setRequiredProof] = useState('none');
+  const [deductionValue, setDeductionValue] = useState('');
 
   // Media attachment for video publishing tasks
   const [taskMediaType, setTaskMediaType] = useState('none');
@@ -116,6 +117,7 @@ export default function ProjectsModule({ session }) {
           estimated_hours: 10,
           actual_hours: 0,
           required_proof: requiredProof,
+          deduction_value: Number(deductionValue) || 0,
           attached_media: taskMediaType !== 'none' && taskMediaUrl ? { type: taskMediaType, url: taskMediaUrl } : null,
           _userId: session.user_id,
         }),
@@ -130,6 +132,7 @@ export default function ProjectsModule({ session }) {
         setAssignedTo('');
         setDeadline('');
         setRequiredProof('none');
+        setDeductionValue('');
         setTaskMediaType('none');
         setTaskMediaUrl('');
         setShowTaskForm(false);
@@ -159,16 +162,26 @@ export default function ProjectsModule({ session }) {
       return;
     }
 
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const updateData = {
+      _id: taskId,
+      _userId: session.user_id,
+      status: nextStatus,
+      completion_percentage: nextStatus === 'completed' ? 100 : 50,
+    };
+
+    if (nextStatus === 'completed') {
+      updateData.completed_at = nowStr;
+      if (taskObj?.deadline && new Date(nowStr) > new Date(taskObj.deadline)) {
+        updateData.is_delayed = true;
+      }
+    }
+
     try {
       const res = await fetch('/api/data/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          _id: taskId,
-          _userId: session.user_id,
-          status: nextStatus,
-          completion_percentage: nextStatus === 'completed' ? 100 : 50,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       const result = await res.json();
@@ -189,17 +202,25 @@ export default function ProjectsModule({ session }) {
       return;
     }
 
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const updateData = {
+      _id: proofTask.task_id,
+      _userId: session.user_id,
+      status: 'completed',
+      completion_percentage: 100,
+      completed_at: nowStr,
+      proof_submitted: { type: proofFileType, value: proofInput }
+    };
+
+    if (proofTask.deadline && new Date(nowStr) > new Date(proofTask.deadline)) {
+      updateData.is_delayed = true;
+    }
+
     try {
       const res = await fetch('/api/data/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          _id: proofTask.task_id,
-          _userId: session.user_id,
-          status: 'completed',
-          completion_percentage: 100,
-          proof_submitted: { type: proofFileType, value: proofInput }
-        }),
+        body: JSON.stringify(updateData),
       });
 
       const result = await res.json();
@@ -342,6 +363,14 @@ export default function ProjectsModule({ session }) {
                                   <span className="badge badge-warning" style={{ fontSize: '10px' }}>
                                     🔒 إثبات: {t.required_proof === 'link' ? 'رابط' : t.required_proof === 'image' ? 'صورة' : t.required_proof === 'video' ? 'فيديو' : 'صوت'}
                                   </span>
+                                )}
+                                {t.deduction_value > 0 && (
+                                  <span className="badge badge-danger" style={{ fontSize: '10px' }}>
+                                    💸 خصم: {t.deduction_value} MRU
+                                  </span>
+                                )}
+                                {t.is_delayed && (
+                                  <span className="badge badge-danger" style={{ fontSize: '10px' }}>⏰ متأخر</span>
                                 )}
                                </div>
 
@@ -516,6 +545,21 @@ export default function ProjectsModule({ session }) {
                       <option value="video">مقطع فيديو توضيحي كدليل إنجاز</option>
                       <option value="audio">بصمة صوتية توضيحية لإنجاز العمل</option>
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">قيمة الخصم عند عدم إنجاز المهمة (MRU)</label>
+                    <input
+                      id="new-task-deduction"
+                      type="number"
+                      className="form-input"
+                      value={deductionValue}
+                      onChange={e => setDeductionValue(e.target.value)}
+                      placeholder="0 = لا يوجد خصم"
+                      min="0"
+                    />
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      سيتم خصم هذه المبلغ من راتب الموظف إذا لم يُنجز المهمة قبل نهاية الشهر
+                    </div>
                   </div>
                   <div className="form-group" style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-accent)' }}>
                     <label className="form-label" style={{ color: 'var(--noxora-yellow-light)' }}>🎥 إرفاق ملف/فيديو للنشر والمونتاج للموظف (اختياري)</label>

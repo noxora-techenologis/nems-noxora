@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
 
+const WORK_HOURS_PER_DAY = 8;
+const WORK_DAYS_PER_MONTH = 30;
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -25,12 +28,13 @@ export async function GET(request) {
     ]);
 
     const today = new Date().toISOString().split('T')[0];
+    const currentMonth = today.substring(0, 7);
 
     const employee = employees.find(e => e.employee_id === employeeIdNum || String(e.employee_id) === String(employeeId));
     const employeeUserId = employee?.user_id;
 
     // Today attendance
-    const todayAttendance = attendance.find(a => a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId));
+    const todayAttendance = attendance.find(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && a.date === today);
 
     // Today hourly logs
     const todayLogs = todayAttendance
@@ -50,17 +54,56 @@ export async function GET(request) {
     });
 
     // This month attendance summary
-    const currentMonth = today.substring(0, 7);
     const monthAttendance = attendance.filter(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && a.date?.startsWith(currentMonth));
 
-    // Tasks
+    const monthTotalHours = monthAttendance.reduce((s, a) => s + (Number(a.total_hours) || 0), 0);
+    const monthAbsentHours = monthAttendance.reduce((s, a) => s + (Number(a.absent_hours) || 0), 0);
+
+    // Tasks - categorize for productivity
     const myTasks = tasks.filter(t => t.assigned_to === employeeIdNum || String(t.assigned_to) === String(employeeId));
+    const monthTasks = myTasks.filter(t => {
+      const created = t.created_at?.substring(0, 7) || '';
+      const deadline = t.deadline || '';
+      return created === currentMonth || deadline.startsWith(currentMonth);
+    });
+
+    const completedTasks = monthTasks.filter(t => t.status === 'completed');
+    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && (t.deadline || '').substring(0, 7) <= currentMonth);
+    const delayedTasks = monthTasks.filter(t => t.is_delayed === true || t.is_delayed === 'true');
+
     const taskStats = {
       total: myTasks.length,
       completed: myTasks.filter(t => t.status === 'completed').length,
       in_progress: myTasks.filter(t => t.status === 'in_progress').length,
       new: myTasks.filter(t => t.status === 'new').length,
+      delayed: delayedTasks.length,
+      uncompleted: uncompletedTasks.length,
+      productivityRate: monthTasks.length > 0
+        ? Math.round((completedTasks.length / monthTasks.length) * 100)
+        : 100,
     };
+
+    // Deductions calculation
+    const salaryType = employee?.salary_type || 'monthly';
+    const hourlyRate = Number(employee?.hourly_rate) || 0;
+    const basicSalary = Number(employee?.basic_salary) || 0;
+
+    const hourlyRateForAbsence = salaryType === 'hourly'
+      ? hourlyRate
+      : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
+
+    const attendanceDeductions = monthAbsentHours * hourlyRateForAbsence;
+    const taskDeductions = uncompletedTasks.reduce((sum, t) => sum + (Number(t.deduction_value) || 0), 0);
+    const totalDeductions = attendanceDeductions + taskDeductions;
+
+    let grossSalary = 0;
+    if (salaryType === 'hourly') {
+      grossSalary = monthTotalHours * hourlyRate;
+    } else {
+      grossSalary = basicSalary;
+    }
+    const allowances = Number(employee?.allowances) || 0;
+    const netSalary = Math.max(0, grossSalary + allowances - totalDeductions);
 
     // Salary
     const latestSalary = salaries.filter(s => s.employee_id === employeeIdNum || String(s.employee_id) === String(employeeId)).sort((a, b) => b.month.localeCompare(a.month))[0];
@@ -81,12 +124,30 @@ export async function GET(request) {
       hourlySlots,
       monthAttendance: {
         total: monthAttendance.length,
-        present: monthAttendance.filter(a => a.status === 'present').length,
-        late: monthAttendance.filter(a => a.status === 'late').length,
+        present: monthAttendance.filter(a => a.status !== 'absent').length,
+        late: monthAttendance.filter(a => a.is_late === true).length,
         absent: monthAttendance.filter(a => a.status === 'absent').length,
-        totalHours: monthAttendance.reduce((s, a) => s + (a.total_hours || 0), 0),
+        totalHours: monthTotalHours,
+        absentHours: monthAbsentHours,
       },
       taskStats,
+      productivity: {
+        totalTasks: monthTasks.length,
+        completed: completedTasks.length,
+        uncompleted: uncompletedTasks.length,
+        delayed: delayedTasks.length,
+        productivityRate: taskStats.productivityRate,
+      },
+      payroll: {
+        salary_type: salaryType,
+        hourly_rate: hourlyRate,
+        gross_salary: grossSalary,
+        allowances: allowances,
+        attendance_deductions: Math.round(attendanceDeductions * 100) / 100,
+        task_deductions: taskDeductions,
+        total_deductions: Math.round(totalDeductions * 100) / 100,
+        net_salary: Math.round(netSalary * 100) / 100,
+      },
       myTasks: myTasks.slice(0, 5),
       latestSalary,
       pendingDeductions,

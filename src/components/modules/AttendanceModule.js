@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 
 const STATUS_LABELS = {
   present: { label: 'حاضر', class: 'badge-success' },
@@ -10,13 +11,17 @@ const STATUS_LABELS = {
   overtime: { label: 'عمل إضافي', class: 'badge-purple' },
 };
 
+const WORK_HOURS_PER_DAY = 8;
+const WORK_DAYS_PER_MONTH = 30;
+
 export default function AttendanceModule({ session }) {
   const [attendance, setAttendance] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('records'); // records, leaves, request
+  const [activeTab, setActiveTab] = useState('records');
   const [checkingIn, setCheckingIn] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
 
@@ -36,26 +41,86 @@ export default function AttendanceModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [attRes, leaveRes, empRes, logRes] = await Promise.all([
+      const [attRes, leaveRes, empRes, logRes, taskRes] = await Promise.all([
         fetch('/api/data/attendance'),
         fetch('/api/data/leaves'),
         fetch('/api/data/employees'),
         fetch('/api/data/attendance_logs'),
+        fetch('/api/data/tasks'),
       ]);
       const attData = await attRes.json();
       const leaveData = await leaveRes.json();
       const empData = await empRes.json();
       const logData = await logRes.json();
+      const taskData = await taskRes.json();
 
       setAttendance(attData.data || []);
       setLeaves(leaveData.data || []);
       setEmployees(empData.data || []);
       setAttendanceLogs(logData.data || []);
+      setTasks(taskData.data || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
+
+  // Calculate monthly payroll summary for current employee
+  const getMonthlyPayroll = () => {
+    if (!session.employee_id) return null;
+    const emp = employees.find(e => e.employee_id === session.employee_id);
+    if (!emp) return null;
+
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const monthAtt = attendance.filter(a => a.employee_id === session.employee_id && a.date?.startsWith(currentMonth));
+    const empTasks = tasks.filter(t => t.assigned_to === session.employee_id);
+    const monthTasks = empTasks.filter(t => {
+      const created = t.created_at?.substring(0, 7) || '';
+      const deadline = t.deadline || '';
+      return created === currentMonth || deadline.startsWith(currentMonth);
+    });
+
+    const totalHours = monthAtt.reduce((s, a) => s + (Number(a.total_hours) || 0), 0);
+    const absentHours = monthAtt.reduce((s, a) => s + (Number(a.absent_hours) || 0), 0);
+    const daysWorked = monthAtt.length;
+    const absentDays = monthAtt.filter(a => a.status === 'absent').length;
+
+    const completedTasks = monthTasks.filter(t => t.status === 'completed');
+    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && (t.deadline || '').substring(0, 7) <= currentMonth);
+
+    const salaryType = emp.salary_type || 'monthly';
+    const hourlyRate = Number(emp.hourly_rate) || 0;
+    const basicSalary = Number(emp.basic_salary) || 0;
+    const allowances = Number(emp.allowances) || 0;
+
+    let grossSalary = 0;
+    if (salaryType === 'hourly') {
+      grossSalary = totalHours * hourlyRate;
+    } else {
+      grossSalary = basicSalary;
+    }
+
+    const hourlyRateForAbsence = salaryType === 'hourly'
+      ? hourlyRate
+      : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
+
+    const attendanceDeductions = absentHours * hourlyRateForAbsence;
+    const taskDeductions = uncompletedTasks.reduce((sum, t) => sum + (Number(t.deduction_value) || 0), 0);
+    const totalDeductions = attendanceDeductions + taskDeductions;
+    const netSalary = Math.max(0, grossSalary + allowances - totalDeductions);
+
+    return {
+      salaryType, hourlyRate, basicSalary, allowances,
+      totalHours, absentHours, daysWorked, absentDays,
+      completedTasks: completedTasks.length,
+      uncompletedTasks: uncompletedTasks.length,
+      totalTasks: monthTasks.length,
+      grossSalary, attendanceDeductions, taskDeductions, totalDeductions, netSalary,
+      productivityRate: monthTasks.length > 0 ? Math.round((completedTasks.length / monthTasks.length) * 100) : 100,
+    };
   };
 
   const handleCheckIn = async () => {
@@ -331,6 +396,59 @@ export default function AttendanceModule({ session }) {
         })()}
       </div>
 
+      {/* Monthly Payroll Summary (for employees only) */}
+      {isEmployee && (() => {
+        const payroll = getMonthlyPayroll();
+        if (!payroll) return null;
+        return (
+          <div style={{
+            background: 'var(--bg-secondary)', border: '1px solid var(--border-accent)',
+            borderRadius: 'var(--radius-lg)', padding: '20px 24px', marginBottom: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
+                💰 ملخص الراتب الشهري — {new Date().toISOString().substring(0, 7)}
+              </h3>
+              <span className={`badge ${payroll.salaryType === 'hourly' ? 'badge-warning' : 'badge-info'}`}>
+                {payroll.salaryType === 'hourly' ? `⏰ راتب بالساعة (${payroll.hourlyRate} MRU/ساعة)` : '📅 راتب شهري ثابت'}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '14px' }}>
+              <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>ساعات الحضور</div>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--success)' }}>{payroll.totalHours}</div>
+              </div>
+              <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>ساعات الغياب</div>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: payroll.absentHours > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>{payroll.absentHours}</div>
+              </div>
+              <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>المنجز</div>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--success)' }}>{payroll.completedTasks}/{payroll.totalTasks}</div>
+              </div>
+              <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>غير المنجز</div>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: payroll.uncompletedTasks > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>{payroll.uncompletedTasks}</div>
+              </div>
+              <div style={{ padding: '12px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>الخصومات</div>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: payroll.totalDeductions > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>-{formatCurrency(payroll.totalDeductions)}</div>
+              </div>
+              <div style={{ padding: '12px', background: 'rgba(39,174,96,0.08)', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid rgba(39,174,96,0.2)' }}>
+                <div style={{ fontSize: '11px', color: 'var(--success)', marginBottom: '4px', fontWeight: 700 }}>صافي الراتب</div>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: 'var(--success)' }}>{formatCurrency(payroll.netSalary)}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{payroll.netSalary} MRU</div>
+              </div>
+            </div>
+            {payroll.totalDeductions > 0 && (
+              <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(231,76,60,0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(231,76,60,0.2)', fontSize: '12px', color: 'var(--danger)' }}>
+                ⚠️ تفصيل الخصومات: غياب {payroll.absentHours} ساعة = {formatCurrency(payroll.attendanceDeductions)} | مهام غير منجزة = {formatCurrency(payroll.taskDeductions)}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--border-primary)', paddingBottom: '12px' }}>
         <button
@@ -371,24 +489,44 @@ export default function AttendanceModule({ session }) {
                 <tr>
                   {!isEmployee && <th>رقم الموظف</th>}
                   <th>التاريخ</th>
-                  <th>وقت الدخول</th>
-                  <th>وقت الخروج</th>
-                  <th>إجمالي الساعات</th>
-                  <th>ساعات الإضافي</th>
+                  <th>ساعات الحضور</th>
+                  <th>ساعات الغياب</th>
+                  <th>المنجز</th>
+                  <th>غير المنجز</th>
+                  <th>الخصومات</th>
+                  <th>صافي الراتب</th>
                   <th>الحالة</th>
                 </tr>
               </thead>
               <tbody>
                 {displayAttendance.map(row => {
                   const statusInfo = STATUS_LABELS[row.status] || { label: row.status, class: 'badge-muted' };
+                  const emp = employees.find(e => e.employee_id === row.employee_id);
+                  const salaryType = emp?.salary_type || 'monthly';
+                  const hourlyRate = Number(emp?.hourly_rate) || 0;
+                  const basicSalary = Number(emp?.basic_salary) || 0;
+                  const dayHours = Number(row.total_hours) || 0;
+                  const dayAbsentHours = Number(row.absent_hours) || 0;
+                  const dayGross = salaryType === 'hourly' ? dayHours * hourlyRate : basicSalary / WORK_DAYS_PER_MONTH;
+                  const hourlyRateForAbsence = salaryType === 'hourly' ? hourlyRate : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
+                  const dayAttDeduction = dayAbsentHours * hourlyRateForAbsence;
+
+                  const dayTasks = tasks.filter(t => t.assigned_to === row.employee_id && t.deadline === row.date);
+                  const completedDayTasks = dayTasks.filter(t => t.status === 'completed').length;
+                  const uncompletedDayTasks = dayTasks.filter(t => t.status !== 'completed').length;
+                  const dayTaskDeductions = dayTasks.filter(t => t.status !== 'completed').reduce((s, t) => s + (Number(t.deduction_value) || 0), 0);
+                  const dayNet = Math.max(0, dayGross - dayAttDeduction - dayTaskDeductions);
+
                   return (
                     <tr key={row.attendance_id} id={`att-${row.attendance_id}`} style={{ transition: 'all var(--transition-fast)' }}>
                       {!isEmployee && <td style={{ fontWeight: 800, color: 'var(--noxora-yellow-light)' }}>{row.employee_id}</td>}
                       <td style={{ fontWeight: 600 }}>{row.date}</td>
-                      <td style={{ fontFamily: 'monospace' }}>{row.check_in ? row.check_in.split(' ')[1] : '-'}</td>
-                      <td style={{ fontFamily: 'monospace' }}>{row.check_out ? row.check_out.split(' ')[1] : '-'}</td>
-                      <td>{row.total_hours ? `${row.total_hours} ساعة` : '-'}</td>
-                      <td>{row.overtime_hours ? `${row.overtime_hours} ساعة` : '-'}</td>
+                      <td><span style={{ fontWeight: 700, color: dayHours >= WORK_HOURS_PER_DAY ? 'var(--success)' : 'var(--text-primary)' }}>{dayHours} / {WORK_HOURS_PER_DAY}</span></td>
+                      <td><span style={{ fontWeight: 700, color: dayAbsentHours > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>{dayAbsentHours} ساعة</span></td>
+                      <td><span className="badge badge-success">{completedDayTasks}</span></td>
+                      <td><span className={`badge ${uncompletedDayTasks > 0 ? 'badge-danger' : 'badge-muted'}`}>{uncompletedDayTasks}</span></td>
+                      <td><span style={{ fontWeight: 700, color: (dayAttDeduction + dayTaskDeductions) > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>-{formatCurrency(dayAttDeduction + dayTaskDeductions)}</span></td>
+                      <td><span style={{ fontWeight: 800, color: 'var(--success)' }}>{formatCurrency(dayNet)}</span></td>
                       <td><span className={`badge ${statusInfo.class}`}>{statusInfo.label}</span></td>
                     </tr>
                   );
