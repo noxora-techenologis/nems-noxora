@@ -41,6 +41,9 @@ export function setPreferredCurrency(currency) {
 
 export function convertCurrency(amount, from = 'MRU', to = 'MRU') {
   if (amount === undefined || amount === null || isNaN(amount)) return 0;
+  if (from === to) return amount;
+  if (from === 'USD' && to === 'MRU') return amount * 39;
+  if (from === 'MRU' && to === 'USD') return amount / 39;
   return amount;
 }
 
