@@ -49,6 +49,7 @@ export default function OwnersModule({ session }) {
 
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
+  const canEditValuation = ['admin', 'owner'].includes(session.role_name.toLowerCase());
 
   useEffect(() => {
     fetchData();
@@ -326,7 +327,7 @@ export default function OwnersModule({ session }) {
 
   const handleUpdateValuation = async (e) => {
     e.preventDefault();
-    if (!isCEO) return;
+    if (!canEditValuation) return;
     try {
       const res = await fetch('/api/data/company_valuation', {
         method: valuation ? 'PUT' : 'POST',
@@ -506,7 +507,7 @@ export default function OwnersModule({ session }) {
                 {formatCurrency(totalAssets)} - {formatCurrency(totalLiabilities)}
               </div>
             </div>
-            {isCEO && (
+            {canEditValuation && (
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button
                   className="btn btn-sm btn-primary"
@@ -519,7 +520,7 @@ export default function OwnersModule({ session }) {
           </div>
 
           {/* Valuation Edit Form (CEO only) */}
-          {showValuationForm && isCEO && (
+          {showValuationForm && canEditValuation && (
             <form onSubmit={handleUpdateValuation} style={{
               padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border-accent)', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px'
