@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getTable, query } from '@/lib/db';
 import { roundMRU } from '@/lib/fees';
+import { verifySession } from '@/lib/serverAuth';
 
 // GET: Return current valuation state
-export async function GET() {
+export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
     const [valuationRows, revenues, expenses, salaries, shares] = await Promise.all([
       getTable('company_valuation'),
       getTable('revenues'),
@@ -47,13 +50,15 @@ export async function GET() {
       pending_to_company_70: pendingToCompany,
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 // POST: Distribute profits (30% to owners, 70% retained)
-export async function POST() {
+export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
     const [valuationRows, revenues, expenses, salaries, shares, existingDists] = await Promise.all([
       getTable('company_valuation'),
       getTable('revenues'),
@@ -126,6 +131,6 @@ export async function POST() {
       },
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

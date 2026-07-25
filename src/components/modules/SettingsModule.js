@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SESSION_KEY } from '@/lib/auth';
+import { SESSION_KEY, getAuthHeaders } from '@/lib/auth';
 
 export default function SettingsModule({ session }) {
   const [settings, setSettings] = useState([]);
@@ -31,7 +31,7 @@ export default function SettingsModule({ session }) {
     try {
       const res = await fetch('/api/data/users', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: session.user_id,
           _userId: session.user_id,
@@ -65,7 +65,7 @@ export default function SettingsModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/system_settings');
+      const res = await fetch('/api/data/system_settings', { headers: getAuthHeaders() });
       const data = await res.json();
       setSettings(data.data || []);
     } catch (err) {
@@ -79,7 +79,7 @@ export default function SettingsModule({ session }) {
     try {
       const res = await fetch('/api/data/system_settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: id,
           _userId: session.user_id,

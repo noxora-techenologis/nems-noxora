@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 import UserProfileModal from '@/components/UserProfileModal';
 
@@ -40,8 +41,8 @@ export default function EmployeesModule({ session }) {
     setLoading(true);
     try {
       const [empRes, deptRes] = await Promise.all([
-        fetch('/api/data/employees'),
-        fetch('/api/data/departments'),
+        fetch('/api/data/employees', { headers: getAuthHeaders() }),
+        fetch('/api/data/departments', { headers: getAuthHeaders() }),
       ]);
       const empData = await empRes.json();
       const deptData = await deptRes.json();
@@ -73,7 +74,7 @@ export default function EmployeesModule({ session }) {
     try {
       const res = await fetch('/api/data/employees', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: selectedEmp.employee_id,
           _userId: session.user_id,

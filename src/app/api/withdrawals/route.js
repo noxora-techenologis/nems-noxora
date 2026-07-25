@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getTable, query } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 const VALID_STATUSES = ['PENDING', 'FINANCIALLY_VERIFIED', 'APPROVED', 'COMPLETED'];
 
 // GET: List withdrawal requests (filtered by role)
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const ownerId = searchParams.get('ownerId');
     const role = searchParams.get('role') || '';
@@ -22,13 +26,16 @@ export async function GET(request) {
 
     return NextResponse.json({ data, total: data.length });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 // POST: Create new withdrawal request (Owner only)
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { owner_id, amount, payment_method, notes, _userId } = body;
 
@@ -67,13 +74,16 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, data: result.rows[0] }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 // PUT: Update status (role-based)
 export async function PUT(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { _id, status, role, user_id, payment_method, notes } = body;
 
@@ -180,13 +190,16 @@ export async function PUT(request) {
 
     return NextResponse.json({ success: true, data: result.rows[0] });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 // DELETE: Cancel request (Owner can cancel PENDING, CEO can cancel any)
 export async function DELETE(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { _id, role, user_id } = body;
 
@@ -209,6 +222,6 @@ export async function DELETE(request) {
     await query(`DELETE FROM "withdrawal_requests" WHERE "request_id" = $1`, [_id]);
     return NextResponse.json({ success: true });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

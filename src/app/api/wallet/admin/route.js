@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server';
 import { getTable, updateRecord, insertRecord } from '@/lib/db';
 import { calcDepositFee, roundMRU } from '@/lib/fees';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
 /**
  * GET /api/wallet/admin
  * Returns all top-up requests for shipping agent / FM review.
  */
-export async function GET() {
+export async function GET(request) {
   try {
+    const { user, error } = await verifySession(request);
+    if (error) return error;
+
+    const roleErr = requireRole(user, ['shipping_agent', 'fm', 'ceo', 'admin']);
+    if (roleErr) return roleErr;
+
     const allTopups = await getTable('topup_requests');
     const pending = allTopups
       .filter(t => t.status === 'pending')
@@ -18,7 +25,7 @@ export async function GET() {
     return NextResponse.json({ pending, all });
   } catch (err) {
     console.error('Wallet Admin GET Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
@@ -28,8 +35,14 @@ export async function GET() {
  */
 export async function PUT(request) {
   try {
+    const { user, error } = await verifySession(request);
+    if (error) return error;
+
+    const roleErr = requireRole(user, ['shipping_agent', 'fm', 'ceo', 'admin']);
+    if (roleErr) return roleErr;
+
     const body = await request.json();
-    const { request_id, action, approved_by } = body;
+    const { request_id, action } = body;
 
     if (!request_id || !action) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 });
@@ -40,12 +53,14 @@ export async function PUT(request) {
     if (!topup) return NextResponse.json({ error: 'طلب غير موجود' }, { status: 404 });
     if (topup.status !== 'pending') return NextResponse.json({ error: 'تم معالجة هذا الطلب مسبقاً' }, { status: 400 });
 
+    const approvedBy = user.user_id;
+
     if (action === 'reject') {
       await updateRecord('topup_requests', topup.request_id, {
         status: 'rejected',
-        approved_by: approved_by || null,
+        approved_by: approvedBy,
         approved_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      }, approved_by || 1);
+      }, approvedBy);
 
       return NextResponse.json({ success: true, message: 'تم رفض طلب الشحن.' });
     }
@@ -64,7 +79,7 @@ export async function PUT(request) {
       await updateRecord('wallets', wallet.wallet_id, {
         balance: newBalance,
         total_deposited: roundMRU(Number(wallet.total_deposited || 0) + creditedAmount),
-      }, approved_by || 1);
+      }, approvedBy);
 
       // Record the deposit with fee info
       const feeNote = feeInfo.fee > 0
@@ -80,7 +95,7 @@ export async function PUT(request) {
         reference_id: topup.request_id,
         description: `شحن المحفظة via بنكيلي — المرسِل: ${topup.sender_name || ''} — رقم المعاملة: ${topup.bankily_txn_id || 'N/A'} — المبلغ الأصلي: ${topup.amount} MRU${feeNote}`,
         status: 'completed',
-      }, approved_by || 1);
+      }, approvedBy);
 
       // If there's a fee, record it as a company revenue
       if (feeInfo.fee > 0) {
@@ -93,15 +108,15 @@ export async function PUT(request) {
           category: 'عمولات',
           date: new Date().toISOString().split('T')[0],
           status: 'approved',
-          created_by: approved_by || 1,
-        }, approved_by || 1);
+          created_by: approvedBy,
+        }, approvedBy);
       }
 
       await updateRecord('topup_requests', topup.request_id, {
         status: 'approved',
-        approved_by: approved_by || null,
+        approved_by: approvedBy,
         approved_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      }, approved_by || 1);
+      }, approvedBy);
 
       const feeMsg = feeInfo.fee > 0
         ? ` (العمولة: ${feeInfo.fee} MRU، الصافي: ${creditedAmount} MRU)`
@@ -119,6 +134,6 @@ export async function PUT(request) {
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err) {
     console.error('Wallet Admin PUT Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

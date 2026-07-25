@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function FinanceModule({ session }) {
   const [revenues, setRevenues] = useState([]);
@@ -48,11 +49,11 @@ export default function FinanceModule({ session }) {
     setLoading(true);
     try {
       const [revRes, expRes, salRes, dedRes, empRes] = await Promise.all([
-        fetch('/api/data/revenues'),
-        fetch('/api/data/expenses'),
-        fetch('/api/data/salaries'),
-        fetch('/api/data/deduction_proposals'),
-        fetch('/api/data/employees'),
+        fetch('/api/data/revenues', { headers: getAuthHeaders() }),
+        fetch('/api/data/expenses', { headers: getAuthHeaders() }),
+        fetch('/api/data/salaries', { headers: getAuthHeaders() }),
+        fetch('/api/data/deduction_proposals', { headers: getAuthHeaders() }),
+        fetch('/api/data/employees', { headers: getAuthHeaders() }),
       ]);
       const revData = await revRes.json();
       const expData = await expRes.json();
@@ -82,7 +83,7 @@ export default function FinanceModule({ session }) {
     try {
       const res = await fetch('/api/data/revenues', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           title: revTitle,
           amount: Number(revAmount),
@@ -99,7 +100,7 @@ export default function FinanceModule({ session }) {
       const result = await res.json();
       if (result.success) {
         // Auto-update company valuation
-        fetch('/api/valuation', { method: 'POST' }).catch(() => {});
+        fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
         alert('تمت إضافة الإيراد بنجاح!');
         setRevTitle('');
         setRevAmount('');
@@ -119,7 +120,7 @@ export default function FinanceModule({ session }) {
     try {
       const res = await fetch('/api/data/expenses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           title: expTitle,
           amount: Number(expAmount),
@@ -139,7 +140,7 @@ export default function FinanceModule({ session }) {
       const result = await res.json();
       if (result.success) {
         // Auto-update company valuation
-        fetch('/api/valuation', { method: 'POST' }).catch(() => {});
+        fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
         alert('تمت إضافة المصروف بنجاح!');
         setExpTitle('');
         setExpAmount('');
@@ -168,7 +169,7 @@ export default function FinanceModule({ session }) {
 
       const res = await fetch('/api/data/deduction_proposals', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(body),
       });
 
@@ -194,7 +195,7 @@ export default function FinanceModule({ session }) {
     try {
       const res = await fetch('/api/data/deduction_proposals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           employee_id: propEmpId,
           amount: Number(propAmount),

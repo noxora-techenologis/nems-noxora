@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query } from '@/lib/db';
 import { calculateMonthlyPayroll } from '@/lib/payroll';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
 /**
  * GET /api/payroll/auto?month=2026-07
@@ -9,6 +10,12 @@ import { calculateMonthlyPayroll } from '@/lib/payroll';
  */
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
+    const roleErr = requireRole(user, ['fm', 'ceo', 'admin']);
+    if (roleErr) return roleErr;
+
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month') || new Date().toISOString().substring(0, 7);
 
@@ -39,45 +46,42 @@ export async function GET(request) {
     return NextResponse.json({ month, employees: payrollResults, totals });
   } catch (err) {
     console.error('Payroll Auto GET Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 /**
  * POST /api/payroll/auto
- * Body: { month: '2026-07', action: 'generate' | 'confirm_payment', _userId }
- *
- * action='generate':
- *   Creates/updates salary records in `salaries` table.
- *   Accessible by: FM only
- *
- * action='confirm_payment':
- *   Marks all pending salaries as 'paid'.
- *   Posts total salary amount to `expenses` table.
- *   Updates `company_valuation` total_expenses.
- *   Accessible by: FM only
+ * Body: { month: '2026-07', action: 'generate' | 'confirm_payment' }
+ * Only FM/Admin can generate or confirm payments.
  */
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
+    const roleErr = requireRole(user, ['fm', 'admin']);
+    if (roleErr) return roleErr;
+
     const body = await request.json();
-    const { month, action, _userId } = body;
+    const { month, action } = body;
 
     if (!month) {
       return NextResponse.json({ error: 'الشهر مطلوب (YYYY-MM)' }, { status: 400 });
     }
 
     if (action === 'generate') {
-      return await handleGenerate(month, _userId);
+      return await handleGenerate(month, user.user_id);
     }
 
     if (action === 'confirm_payment') {
-      return await handleConfirmPayment(month, _userId);
+      return await handleConfirmPayment(month, user.user_id);
     }
 
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err) {
     console.error('Payroll Auto POST Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 

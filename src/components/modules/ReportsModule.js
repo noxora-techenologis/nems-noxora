@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function ReportsModule({ session }) {
   const [employees, setEmployees] = useState([]);
@@ -27,12 +28,12 @@ export default function ReportsModule({ session }) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/data/employees').then(r => r.json()),
-      fetch('/api/data/attendance').then(r => r.json()),
-      fetch('/api/data/tasks').then(r => r.json()),
-      fetch('/api/data/revenues').then(r => r.json()),
-      fetch('/api/data/expenses').then(r => r.json()),
-      fetch('/api/data/salaries').then(r => r.json()),
+      fetch('/api/data/employees', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/attendance', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/tasks', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/revenues', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/expenses', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/salaries', { headers: getAuthHeaders() }).then(r => r.json()),
     ]).then(([emp, att, tsk, rev, exp, sal]) => {
       setEmployees(emp.data || []);
       setAttendance(att.data || []);
@@ -46,7 +47,7 @@ export default function ReportsModule({ session }) {
 
   const fetchPayroll = async () => {
     try {
-      const res = await fetch(`/api/payroll?month=${selectedMonth}`);
+      const res = await fetch(`/api/payroll?month=${selectedMonth}`, { headers: getAuthHeaders() });
       const data = await res.json();
       setPayrollData(data);
     } catch (err) {
@@ -64,7 +65,7 @@ export default function ReportsModule({ session }) {
     try {
       const res = await fetch('/api/payroll', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ month: selectedMonth, _userId: session.user_id }),
       });
       const result = await res.json();

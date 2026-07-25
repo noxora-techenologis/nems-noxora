@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport, formatNumber } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function ClientsModule({ session }) {
   const [clients, setClients] = useState([]);
@@ -39,10 +40,10 @@ export default function ClientsModule({ session }) {
     setLoading(true);
     try {
       const [clientRes, projRes, revRes, fileRes] = await Promise.all([
-        fetch('/api/data/clients'),
-        fetch('/api/data/projects'),
-        fetch('/api/data/revenues'),
-        fetch('/api/data/files'),
+        fetch('/api/data/clients', { headers: getAuthHeaders() }),
+        fetch('/api/data/projects', { headers: getAuthHeaders() }),
+        fetch('/api/data/revenues', { headers: getAuthHeaders() }),
+        fetch('/api/data/files', { headers: getAuthHeaders() }),
       ]);
       
       const clientData = await clientRes.json();
@@ -77,7 +78,7 @@ export default function ClientsModule({ session }) {
     try {
       const res = await fetch('/api/data/clients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           name: clientName,
           email: clientEmail,
@@ -132,7 +133,7 @@ export default function ClientsModule({ session }) {
     try {
       const res = await fetch('/api/data/clients', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: selectedClient.client_id,
           communication_log: updatedLogs,

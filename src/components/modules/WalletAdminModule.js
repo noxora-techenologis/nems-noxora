@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import { calcDepositFee, calcWithdrawalFee } from '@/lib/fees';
+import { getSession, getAuthHeaders } from '@/lib/auth';
 
 const TOPUP_STATUS = {
   pending: { label: 'قيد المراجعة', color: 'var(--warning)' },
@@ -48,8 +49,8 @@ export default function WalletAdminModule({ session }) {
     setLoading(true);
     try {
       const [topupRes, wdRes] = await Promise.all([
-        fetch('/api/wallet/admin'),
-        fetch('/api/withdrawals?role=all'),
+        fetch('/api/wallet/admin', { headers: getAuthHeaders() }),
+        fetch('/api/withdrawals?role=all', { headers: getAuthHeaders() }),
       ]);
       const topupData = await topupRes.json();
       const wdData = await wdRes.json();
@@ -69,7 +70,7 @@ export default function WalletAdminModule({ session }) {
     try {
       const res = await fetch('/api/wallet/admin', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ request_id: requestId, action, approved_by: session.user_id }),
       });
       const result = await res.json();
@@ -88,7 +89,7 @@ export default function WalletAdminModule({ session }) {
     try {
       const res = await fetch('/api/withdrawals', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ request_id: requestId, action, approved_by: session.user_id }),
       });
       const result = await res.json();

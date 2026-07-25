@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getTable, updateRecord, auditLog } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 const MAX_SLOTS = 8;
 const MIN_SLOTS_REQUIRED = 2;
 
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { employee_id, user_id } = await request.json();
 
     if (!employee_id) {
@@ -87,6 +91,6 @@ export async function POST(request) {
 
   } catch (err) {
     console.error('Check-out Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

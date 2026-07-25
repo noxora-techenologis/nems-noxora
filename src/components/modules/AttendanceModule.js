@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 const STATUS_LABELS = {
   present: { label: 'حاضر', class: 'badge-success' },
@@ -42,11 +43,11 @@ export default function AttendanceModule({ session }) {
     setLoading(true);
     try {
       const [attRes, leaveRes, empRes, logRes, taskRes] = await Promise.all([
-        fetch('/api/data/attendance'),
-        fetch('/api/data/leaves'),
-        fetch('/api/data/employees'),
-        fetch('/api/data/attendance_logs'),
-        fetch('/api/data/tasks'),
+        fetch('/api/data/attendance', { headers: getAuthHeaders() }),
+        fetch('/api/data/leaves', { headers: getAuthHeaders() }),
+        fetch('/api/data/employees', { headers: getAuthHeaders() }),
+        fetch('/api/data/attendance_logs', { headers: getAuthHeaders() }),
+        fetch('/api/data/tasks', { headers: getAuthHeaders() }),
       ]);
       const attData = await attRes.json();
       const leaveData = await leaveRes.json();
@@ -143,7 +144,7 @@ export default function AttendanceModule({ session }) {
       try {
         const res = await fetch('/api/attendance/checkin', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ employee_id: session.employee_id, user_id: session.user_id }),
         });
         const result = await res.json();
@@ -181,7 +182,7 @@ export default function AttendanceModule({ session }) {
     try {
       const res = await fetch('/api/data/leaves', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           employee_id: session.employee_id,
           type: leaveType,
@@ -214,7 +215,7 @@ export default function AttendanceModule({ session }) {
     try {
       const res = await fetch('/api/data/leaves', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: leaveId,
           _userId: session.user_id,
@@ -252,7 +253,7 @@ export default function AttendanceModule({ session }) {
       try {
         const res = await fetch('/api/attendance/checkout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ employee_id: session.employee_id, user_id: session.user_id }),
         });
         const result = await res.json();

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 const WORK_HOURS_PER_DAY = 8;
 const WORK_DAYS_PER_MONTH = 22;
@@ -8,6 +9,9 @@ const WORK_DAYS_PER_MONTH = 22;
 // GET /api/payroll?month=2026-07&employeeId=1
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month') || new Date().toISOString().substring(0, 7);
     const employeeId = searchParams.get('employeeId');
@@ -118,7 +122,7 @@ export async function GET(request) {
     return NextResponse.json({ month, employees: results, totals });
   } catch (err) {
     console.error('Payroll GET Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
@@ -126,6 +130,9 @@ export async function GET(request) {
 // POST /api/payroll { month: '2026-07', employee_ids: [1,2,3] }
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { month, employee_ids, _userId } = body;
 
@@ -192,6 +199,6 @@ export async function POST(request) {
     });
   } catch (err) {
     console.error('Payroll POST Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

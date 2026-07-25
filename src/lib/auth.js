@@ -100,3 +100,14 @@ export function getDashboardPath(role, dashboardType) {
   const roleKey = normalizeRoleKey(target);
   return `/dashboard/${roleKey}`;
 }
+
+/**
+ * Get auth headers for API calls — sends user_id for server-side verification.
+ * Use this for all fetch() calls to protected API routes.
+ */
+export function getAuthHeaders() {
+  if (typeof window === 'undefined') return {};
+  const session = getSession();
+  if (!session) return {};
+  return { 'x-user-id': String(session.user_id) };
+}

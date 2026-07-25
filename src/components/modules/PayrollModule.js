@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function PayrollModule({ session }) {
   const [payrollData, setPayrollData] = useState(null);
@@ -31,7 +32,7 @@ export default function PayrollModule({ session }) {
   const fetchPayroll = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/payroll/auto?month=${selectedMonth}`);
+      const res = await fetch(`/api/payroll/auto?month=${selectedMonth}`, { headers: getAuthHeaders() });
       const data = await res.json();
       setPayrollData(data);
     } catch (err) {
@@ -47,7 +48,7 @@ export default function PayrollModule({ session }) {
     try {
       const res = await fetch('/api/payroll/auto', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ month: selectedMonth, action: 'generate', _userId: session.user_id }),
       });
       const result = await res.json();
@@ -88,7 +89,7 @@ export default function PayrollModule({ session }) {
     try {
       const res = await fetch('/api/payroll/auto', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ month: selectedMonth, action: 'confirm_payment', _userId: session.user_id }),
       });
       const result = await res.json();

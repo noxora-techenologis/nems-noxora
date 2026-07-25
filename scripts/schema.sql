@@ -627,3 +627,139 @@ CREATE TABLE IF NOT EXISTS project_votes (
   updated_at TIMESTAMP,
   UNIQUE(proposal_id, user_id)
 );
+
+-- ============================================================
+-- MISSING TABLES (added in audit pass)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS withdrawal_requests (
+  request_id SERIAL PRIMARY KEY,
+  owner_id INT REFERENCES owners(owner_id),
+  user_id INT,
+  amount DECIMAL(15,2) NOT NULL,
+  payment_method VARCHAR(50) DEFAULT 'تحويل بنكي',
+  notes TEXT,
+  status VARCHAR(30) DEFAULT 'PENDING',
+  created_by INT,
+  approved_by INT,
+  approved_at TIMESTAMP,
+  verified_by INT,
+  verified_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS company_valuation (
+  valuation_id SERIAL PRIMARY KEY,
+  capital DECIMAL(15,2) DEFAULT 25000,
+  retained_earnings DECIMAL(15,2) DEFAULT 0,
+  distributed_profit DECIMAL(15,2) DEFAULT 0,
+  total_shares INT DEFAULT 1000,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS company_debts (
+  debt_id SERIAL PRIMARY KEY,
+  debtor_name VARCHAR(200) NOT NULL,
+  debtor_type VARCHAR(50) DEFAULT 'عميل',
+  amount DECIMAL(15,2) NOT NULL,
+  paid_amount DECIMAL(15,2) DEFAULT 0,
+  borrowing_date DATE,
+  due_date DATE,
+  description TEXT,
+  status VARCHAR(20) DEFAULT 'pending',
+  created_by INT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP
+);
+
+-- ============================================================
+-- MISSING COLUMNS (ALTER TABLE for existing tables)
+-- ============================================================
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'owners' AND column_name = 'active_roles') THEN
+    ALTER TABLE "owners" ADD COLUMN "active_roles" JSONB DEFAULT '["OWNER"]'::jsonb;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'role_name') THEN
+    ALTER TABLE "users" ADD COLUMN "role_name" VARCHAR(100);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'topup_requests' AND column_name = 'sender_name') THEN
+    ALTER TABLE "topup_requests" ADD COLUMN "sender_name" VARCHAR(150);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'topup_requests' AND column_name = 'bankily_txn_id') THEN
+    ALTER TABLE "topup_requests" ADD COLUMN "bankily_txn_id" VARCHAR(30);
+  END IF;
+END $$;
+
+-- ============================================================
+-- PERFORMANCE INDEXES
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_employees_user_id ON employees(user_id);
+CREATE INDEX IF NOT EXISTS idx_employees_department_id ON employees(department_id);
+CREATE INDEX IF NOT EXISTS idx_employees_salary_type ON employees(salary_type);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_employee_id ON attendance(employee_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+CREATE INDEX IF NOT EXISTS idx_attendance_employee_date ON attendance(employee_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+
+CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON wallets(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_wallet_id ON wallet_transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type ON wallet_transactions(type);
+
+CREATE INDEX IF NOT EXISTS idx_topup_requests_wallet_id ON topup_requests(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_topup_requests_status ON topup_requests(status);
+CREATE INDEX IF NOT EXISTS idx_topup_requests_user_id ON topup_requests(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_owner_id ON withdrawal_requests(owner_id);
+CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON withdrawal_requests(status);
+
+CREATE INDEX IF NOT EXISTS idx_project_investments_project_id ON project_investments(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_investments_wallet_id ON project_investments(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_project_investments_user_id ON project_investments(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_project_proposals_project_id ON project_proposals(project_id);
+
+CREATE INDEX IF NOT EXISTS idx_revenues_date ON revenues(date);
+CREATE INDEX IF NOT EXISTS idx_revenues_category ON revenues(category);
+CREATE INDEX IF NOT EXISTS idx_revenues_status ON revenues(status);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
+
+CREATE INDEX IF NOT EXISTS idx_salaries_employee_id ON salaries(employee_id);
+CREATE INDEX IF NOT EXISTS idx_salaries_month ON salaries(month);
+CREATE INDEX IF NOT EXISTS idx_salaries_status ON salaries(status);
+
+CREATE INDEX IF NOT EXISTS idx_profit_distributions_owner_id ON profit_distributions(owner_id);
+
+CREATE INDEX IF NOT EXISTS idx_owners_user_id ON owners(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
+
+CREATE INDEX IF NOT EXISTS idx_company_debts_status ON company_debts(status);
+CREATE INDEX IF NOT EXISTS idx_company_debts_debtor_type ON company_debts(debtor_type);

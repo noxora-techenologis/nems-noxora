@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport, formatNumber } from '@/lib/format';
 import CandlestickChart from '@/components/CandlestickChart';
+import { getSession, getAuthHeaders } from '@/lib/auth';
 
 const COLORS = ['#C0392B', '#F39C12', '#3498DB', '#9B59B6', '#1ABC9C'];
 
@@ -71,18 +72,18 @@ export default function OwnersModule({ session }) {
     setLoading(true);
     try {
       const [ownRes, shrRes, vtRes, optRes, uVtRes, txnRes, posRes, valRes, profRes, distRes, wdRes, roleRes] = await Promise.all([
-        fetch('/api/data/owners'),
-        fetch('/api/data/shares'),
-        fetch('/api/data/votes'),
-        fetch('/api/data/vote_options'),
-        fetch('/api/data/user_votes'),
-        fetch('/api/data/share_transactions'),
-        fetch('/api/data/position_requests'),
-        fetch('/api/data/company_valuation'),
-        fetch('/api/valuation'),
-        fetch('/api/data/profit_distributions'),
-        fetch(`/api/withdrawals?ownerId=${session.owner_id || ''}&role=${session.role_name || ''}`),
-        fetch(`/api/owner-roles?ownerId=${session.owner_id || ''}`),
+        fetch('/api/data/owners', { headers: getAuthHeaders() }),
+        fetch('/api/data/shares', { headers: getAuthHeaders() }),
+        fetch('/api/data/votes', { headers: getAuthHeaders() }),
+        fetch('/api/data/vote_options', { headers: getAuthHeaders() }),
+        fetch('/api/data/user_votes', { headers: getAuthHeaders() }),
+        fetch('/api/data/share_transactions', { headers: getAuthHeaders() }),
+        fetch('/api/data/position_requests', { headers: getAuthHeaders() }),
+        fetch('/api/data/company_valuation', { headers: getAuthHeaders() }),
+        fetch('/api/valuation', { headers: getAuthHeaders() }),
+        fetch('/api/data/profit_distributions', { headers: getAuthHeaders() }),
+        fetch(`/api/withdrawals?ownerId=${session.owner_id || ''}&role=${session.role_name || ''}`, { headers: getAuthHeaders() }),
+        fetch(`/api/owner-roles?ownerId=${session.owner_id || ''}`, { headers: getAuthHeaders() }),
       ]);
       const ownData = await ownRes.json();
       const shrData = await shrRes.json();
@@ -130,7 +131,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/withdrawals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           owner_id: session.owner_id,
           amount: Number(withdrawAmount),
@@ -160,7 +161,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/withdrawals', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: requestId,
           status: newStatus,
@@ -185,7 +186,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/withdrawals', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ _id: requestId, role: session.role_name, user_id: session.user_id }),
       });
       const result = await res.json();
@@ -226,7 +227,7 @@ export default function OwnersModule({ session }) {
       // 1. Create main vote
       const voteRes = await fetch('/api/data/votes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           title: voteTitle,
           description: voteDesc,
@@ -254,7 +255,7 @@ export default function OwnersModule({ session }) {
       for (const optText of optionsArr) {
         await fetch('/api/data/vote_options', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({
             vote_id: createdVote.vote_id,
             option_text: optText.trim(),
@@ -294,7 +295,7 @@ export default function OwnersModule({ session }) {
       // 1. Record user vote
       const voteRes = await fetch('/api/data/user_votes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           vote_id: voteId,
           user_id: session.user_id,
@@ -313,7 +314,7 @@ export default function OwnersModule({ session }) {
           const nextWeight = parseFloat((((optToUpdate.votes_count * optToUpdate.weighted_percentage * totalShares / 100) + sharesWeight) / totalShares * 100).toFixed(2));
           await fetch('/api/data/vote_options', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
             body: JSON.stringify({
               _id: optionId,
               _userId: session.user_id,
@@ -354,7 +355,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/data/share_transactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           from_owner_id: currentOwner.owner_id,
           to_owner_id: txnType !== 'sell' ? Number(txnToOwnerId) : null,
@@ -386,7 +387,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/data/share_transactions', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: txnId,
           _userId: session.user_id,
@@ -422,7 +423,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/owner-roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           owner_id: currentOwner.owner_id,
           position_code: reqRole,
@@ -449,7 +450,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/data/company_valuation', {
         method: valuation ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(valuation ? {
           _id: valuation.valuation_id,
           _userId: session.user_id,
@@ -482,7 +483,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/owner-roles', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           request_id: reqId,
           action: approved ? 'approve' : 'reject',
@@ -511,7 +512,7 @@ export default function OwnersModule({ session }) {
     try {
       const res = await fetch('/api/owner-roles', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           action: 'demote',
           owner_id: session.owner_id,
@@ -675,7 +676,7 @@ export default function OwnersModule({ session }) {
               </div>
               <button className="btn btn-primary btn-sm" onClick={async () => {
                 if (!confirm('هل تريد توزيع الأرباح الآن؟')) return;
-                const res = await fetch('/api/valuation', { method: 'POST' });
+                const res = await fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() });
                 const data = await res.json();
                 if (data.success) {
                   alert(`تم التوزيع بنجاح!\nأرباح للملاك: ${formatCurrency(data.data.distributed_to_owners)}\nأرباح محتفظ بها: ${formatCurrency(data.data.retained_by_company)}\nقيمة الشركة الجديدة: ${formatCurrency(data.data.new_company_value)}`);

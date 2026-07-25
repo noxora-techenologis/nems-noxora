@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function DocumentsModule({ session }) {
   const [files, setFiles] = useState([]);
@@ -20,8 +21,8 @@ export default function DocumentsModule({ session }) {
     setLoading(true);
     try {
       const [filesRes, verRes] = await Promise.all([
-        fetch('/api/data/files'),
-        fetch('/api/data/file_versions'),
+        fetch('/api/data/files', { headers: getAuthHeaders() }),
+        fetch('/api/data/file_versions', { headers: getAuthHeaders() }),
       ]);
       const filesData = await filesRes.json();
       const verData = await verRes.json();
@@ -43,7 +44,7 @@ export default function DocumentsModule({ session }) {
       // 1. Create file record
       const fileRes = await fetch('/api/data/files', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           name: newName + '.pdf',
           original_name: newName.toLowerCase().replace(/\s+/g, '_') + '.pdf',
@@ -70,7 +71,7 @@ export default function DocumentsModule({ session }) {
       // 2. Create version entry
       await fetch('/api/data/file_versions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           file_id: createdFile.file_id,
           version_number: 1,

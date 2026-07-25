@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function DebtsModule({ session }) {
   const [debts, setDebts] = useState([]);
@@ -36,7 +37,7 @@ export default function DebtsModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/company_debts');
+      const res = await fetch('/api/data/company_debts', { headers: getAuthHeaders() });
       const data = await res.json();
       setDebts(data.data || []);
     } catch (err) {
@@ -52,7 +53,7 @@ export default function DebtsModule({ session }) {
     try {
       const res = await fetch('/api/data/company_debts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           debtor_name: debtorName,
           debtor_type: debtorType,
@@ -99,7 +100,7 @@ export default function DebtsModule({ session }) {
       const newStatus = newPaid >= Number(selectedDebt.amount) ? 'paid' : 'partial';
       const res = await fetch('/api/data/company_debts', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: selectedDebt.debt_id,
           _userId: session.user_id,
@@ -127,7 +128,7 @@ export default function DebtsModule({ session }) {
     try {
       const res = await fetch('/api/data/company_debts', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ _id: debtId, _userId: session.user_id }),
       });
       const result = await res.json();

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 /**
  * GET /api/projects/proposals?projectId=X
@@ -7,6 +8,9 @@ import { getTable, insertRecord, updateRecord } from '@/lib/db';
  */
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
 
@@ -52,7 +56,7 @@ export async function GET(request) {
     return NextResponse.json({ proposals: enriched });
   } catch (err) {
     console.error('Proposals GET Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
@@ -62,6 +66,9 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { action, projectId, userId, title, description, proposalId, choice, investmentId, weight } = body;
 
@@ -146,6 +153,6 @@ export async function POST(request) {
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err) {
     console.error('Proposals POST Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

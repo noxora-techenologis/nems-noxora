@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 const STATUS_LABELS = {
   active: { label: 'نشط', class: 'badge-success' },
@@ -92,9 +93,9 @@ export default function ProjectsModule({ session }) {
     setLoading(true);
     try {
       const [projRes, taskRes, empRes] = await Promise.all([
-        fetch('/api/data/projects'),
-        fetch('/api/data/tasks'),
-        fetch('/api/data/employees'),
+        fetch('/api/data/projects', { headers: getAuthHeaders() }),
+        fetch('/api/data/tasks', { headers: getAuthHeaders() }),
+        fetch('/api/data/employees', { headers: getAuthHeaders() }),
       ]);
       const projData = await projRes.json();
       const taskData = await taskRes.json();
@@ -121,8 +122,8 @@ export default function ProjectsModule({ session }) {
   const fetchInvestmentData = async (projectId) => {
     try {
       const [invRes, propRes] = await Promise.all([
-        fetch(`/api/projects/invest?projectId=${projectId}`),
-        fetch(`/api/projects/proposals?projectId=${projectId}`),
+        fetch(`/api/projects/invest?projectId=${projectId}`, { headers: getAuthHeaders() }),
+        fetch(`/api/projects/proposals?projectId=${projectId}`, { headers: getAuthHeaders() }),
       ]);
       const invData = await invRes.json();
       const propData = await propRes.json();
@@ -141,7 +142,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/projects/invest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           projectId: selectedProj.project_id,
           userId: session.user_id,
@@ -175,7 +176,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/projects/close', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           projectId: selectedProj.project_id,
           profitAmount: profit,
@@ -200,7 +201,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/projects/proposals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           action: 'create',
           projectId: selectedProj.project_id,
@@ -227,7 +228,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/projects/proposals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           action: 'vote',
           proposalId,
@@ -256,7 +257,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/data/projects', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           name: projName,
           description: projDesc,
@@ -303,7 +304,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/data/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           project_id: selectedProj.project_id,
           assigned_to: assignedTo,
@@ -380,7 +381,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/data/tasks', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(updateData),
       });
 
@@ -419,7 +420,7 @@ export default function ProjectsModule({ session }) {
     try {
       const res = await fetch('/api/data/tasks', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify(updateData),
       });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function MessagesModule({ session }) {
   const [conversations, setConversations] = useState([]);
@@ -25,9 +26,9 @@ export default function MessagesModule({ session }) {
     setLoading(true);
     try {
       const [convRes, msgRes, userRes] = await Promise.all([
-        fetch('/api/data/conversations'),
-        fetch('/api/data/messages'),
-        fetch('/api/data/users'),
+        fetch('/api/data/conversations', { headers: getAuthHeaders() }),
+        fetch('/api/data/messages', { headers: getAuthHeaders() }),
+        fetch('/api/data/users', { headers: getAuthHeaders() }),
       ]);
       const convData = await convRes.json();
       const msgData = await msgRes.json();
@@ -54,7 +55,7 @@ export default function MessagesModule({ session }) {
     try {
       const res = await fetch('/api/data/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           sender_id: session.user_id,
           receiver_id: null,
@@ -71,7 +72,7 @@ export default function MessagesModule({ session }) {
       if (result.success) {
         setText('');
         // Refresh messages list
-        const msgRes = await fetch('/api/data/messages');
+        const msgRes = await fetch('/api/data/messages', { headers: getAuthHeaders() });
         const msgData = await msgRes.json();
         setMessages(msgData.data || []);
       } else {

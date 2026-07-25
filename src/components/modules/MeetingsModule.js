@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getAuthHeaders } from '@/lib/auth';
 
 const MEETING_TYPES = [
   { key: 'all', label: '📋 الكل', color: 'var(--text-muted)' },
@@ -41,9 +42,9 @@ export default function MeetingsModule({ session }) {
     setLoading(true);
     try {
       const [meetRes, empRes, projRes] = await Promise.all([
-        fetch('/api/data/meetings'),
-        fetch('/api/data/employees'),
-        fetch('/api/data/projects'),
+        fetch('/api/data/meetings', { headers: getAuthHeaders() }),
+        fetch('/api/data/employees', { headers: getAuthHeaders() }),
+        fetch('/api/data/projects', { headers: getAuthHeaders() }),
       ]);
       const meetData = await meetRes.json();
       const empData = await empRes.json();
@@ -66,7 +67,7 @@ export default function MeetingsModule({ session }) {
     try {
       const res = await fetch('/api/data/meetings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           title,
           description,
@@ -106,7 +107,7 @@ export default function MeetingsModule({ session }) {
     try {
       const res = await fetch('/api/data/meetings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: meetingId,
           _userId: session.user_id,

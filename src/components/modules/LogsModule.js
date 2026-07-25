@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function LogsModule() {
   const [logs, setLogs] = useState([]);
@@ -14,7 +15,7 @@ export default function LogsModule() {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/audit_log');
+      const res = await fetch('/api/data/audit_log', { headers: getAuthHeaders() });
       const data = await res.json();
       setLogs((data.data || []).reverse()); // newest first
     } catch (err) {

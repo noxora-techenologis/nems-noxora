@@ -1,20 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getTable, updateRecord, insertRecord } from '@/lib/db';
 import { roundMRU } from '@/lib/fees';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
 /**
  * POST /api/projects/close
- * Body: { projectId, profitAmount, userId }
- *
- * Closes a project and distributes profits:
- * - 50% to company (increases company valuation via retained_earnings)
- * - 50% to investors proportional to their investment share
- * - Each investor's share deposited into their wallet
+ * Body: { projectId, profitAmount }
+ * Only CEO/Admin/FM can close projects.
  */
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
+    const roleErr = requireRole(user, ['ceo', 'admin', 'fm']);
+    if (roleErr) return roleErr;
+
     const body = await request.json();
-    const { projectId, profitAmount, userId } = body;
+    const { projectId, profitAmount } = body;
 
     if (!projectId) {
       return NextResponse.json({ error: 'projectId مطلوب' }, { status: 400 });
@@ -41,7 +44,7 @@ export async function POST(request) {
       status: 'completed',
       profit_amount: profit,
       closed_at: now,
-    }, Number(userId));
+    }, user.user_id);
 
     // 2. 50% to company — update company_valuation retained_earnings
     const companyShare = profit * 0.5;
@@ -53,7 +56,7 @@ export async function POST(request) {
         await updateRecord('company_valuation', val.valuation_id, {
           retained_earnings: roundMRU(currentRetained + companyShare),
           updated_at: now,
-        }, Number(userId));
+        }, user.user_id);
       }
 
       // Also log as revenue for the company
@@ -66,8 +69,8 @@ export async function POST(request) {
         category: 'استثمار',
         date: today,
         status: 'approved',
-        created_by: Number(userId),
-      }, Number(userId));
+        created_by: user.user_id,
+      }, user.user_id);
     }
 
     // 3. 50% to investors — proportional to investment
@@ -93,7 +96,7 @@ export async function POST(request) {
       await updateRecord('project_investments', inv.investment_id, {
         roi_earned: Number(inv.roi_earned || 0) + investorProfit,
         status: 'paid_out',
-      }, Number(userId));
+      }, user.user_id);
 
       // Credit wallet
       const wallets = await getTable('wallets');
@@ -104,7 +107,7 @@ export async function POST(request) {
       await updateRecord('wallets', wallet.wallet_id, {
         balance: newBalance,
         total_earned: roundMRU(Number(wallet.total_earned || 0) + investorProfit),
-      }, Number(userId));
+      }, user.user_id);
 
       // Wallet transaction
       await insertRecord('wallet_transactions', {
@@ -116,7 +119,7 @@ export async function POST(request) {
         reference_id: Number(projectId),
         description: `عائد استثمار من مشروع: ${project.name} — ${(investmentSharePct * 100).toFixed(2)}% من الأرباح`,
         status: 'completed',
-      }, Number(userId));
+      }, user.user_id);
 
       distributionResults.push({
         user_id: inv.user_id,
@@ -137,6 +140,6 @@ export async function POST(request) {
     });
   } catch (err) {
     console.error('Project Close Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

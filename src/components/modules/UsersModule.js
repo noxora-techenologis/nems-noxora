@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getAuthHeaders } from '@/lib/auth';
 
 import UserProfileModal from '@/components/UserProfileModal';
 
@@ -25,8 +26,8 @@ export default function UsersModule({ session }) {
     setLoading(true);
     try {
       const [usrRes, roleRes] = await Promise.all([
-        fetch('/api/data/users'),
-        fetch('/api/data/roles'),
+        fetch('/api/data/users', { headers: getAuthHeaders() }),
+        fetch('/api/data/roles', { headers: getAuthHeaders() }),
       ]);
       const usrData = await usrRes.json();
       const roleData = await roleRes.json();
@@ -47,7 +48,7 @@ export default function UsersModule({ session }) {
     try {
       const res = await fetch('/api/data/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           name: name,
           email: email,
@@ -67,7 +68,7 @@ export default function UsersModule({ session }) {
         try {
           await fetch('/api/data/employees', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
             body: JSON.stringify({
               user_id: newUser.user_id,
               name: name,
@@ -99,7 +100,7 @@ export default function UsersModule({ session }) {
     try {
       const res = await fetch('/api/data/users', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: userId,
           _userId: session.user_id,

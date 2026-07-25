@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query, auditLog } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 // Work hours: 08:00 - 17:00 = 8 hourly slots
 const WORK_START_HOUR = 8;
@@ -16,6 +17,9 @@ function getCurrentSlot(now) {
 
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { employee_id, user_id } = await request.json();
 
     if (!employee_id) {
@@ -99,6 +103,6 @@ export async function POST(request) {
 
   } catch (err) {
     console.error('Check-in Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

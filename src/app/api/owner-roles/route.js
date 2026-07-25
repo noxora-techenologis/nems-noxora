@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, query } from '@/lib/db';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
 const ALL_POSITIONS = [
   // الإدارة العليا والتنفيذية
@@ -114,8 +115,11 @@ export async function POST(request) {
 // PUT: Approve position request (CEO) OR Self-demotion (Owner)
 export async function PUT(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
-    const { request_id, action, role, user_id, owner_id, position_code } = body;
+    const { request_id, action, owner_id, position_code } = body;
 
     // === SELF-DEMOTION ===
     if (action === 'demote') {
@@ -127,10 +131,15 @@ export async function PUT(request) {
         return NextResponse.json({ error: 'لا يمكن حذف المنصب الأساسي OWNER' }, { status: 400 });
       }
 
+      // Verify the requester IS the owner being demoted (server-side check)
       const owners = await getTable('owners');
       const owner = owners.find(o => o.owner_id === Number(owner_id));
       if (!owner) {
         return NextResponse.json({ error: 'المالك غير موجود' }, { status: 404 });
+      }
+
+      if (owner.user_id !== user.user_id) {
+        return NextResponse.json({ error: 'غير مصرح — يمكنك التنازل عن مناصبك فقط' }, { status: 403 });
       }
 
       const activeRoles = owner.active_roles || ['OWNER'];
@@ -164,12 +173,10 @@ export async function PUT(request) {
       });
     }
 
-    // === APPROVAL (CEO only) ===
+    // === APPROVAL — Server-side role check (CEO/Admin only) ===
     if (action === 'approve') {
-      const roleLower = (role || '').toLowerCase();
-      if (!['ceo', 'admin'].includes(roleLower)) {
-        return NextResponse.json({ error: 'فقط المدير العام يمكنه الاعتماد' }, { status: 403 });
-      }
+      const roleErr = requireRole(user, ['ceo', 'admin']);
+      if (roleErr) return roleErr;
 
       const requests = await getTable('position_requests');
       const req = requests.find(r => r.request_id === Number(request_id));
@@ -183,7 +190,7 @@ export async function PUT(request) {
       // Update request status
       await query(
         `UPDATE "position_requests" SET "status" = 'approved', "approved_by" = $1, "approved_at" = NOW(), "updated_at" = NOW() WHERE "request_id" = $2`,
-        [user_id, request_id]
+        [user.user_id, request_id]
       );
 
       // Add role to owner's active_roles (ACCUMULATION - add, don't replace)
@@ -217,16 +224,14 @@ export async function PUT(request) {
       });
     }
 
-    // === REJECT (CEO) ===
+    // === REJECT — Server-side role check (CEO/Admin only) ===
     if (action === 'reject') {
-      const roleLower = (role || '').toLowerCase();
-      if (!['ceo', 'admin'].includes(roleLower)) {
-        return NextResponse.json({ error: 'فقط المدير العام يمكنه الرفض' }, { status: 403 });
-      }
+      const roleErr = requireRole(user, ['ceo', 'admin']);
+      if (roleErr) return roleErr;
 
       await query(
         `UPDATE "position_requests" SET "status" = 'rejected', "approved_by" = $1, "approved_at" = NOW(), "updated_at" = NOW() WHERE "request_id" = $2`,
-        [user_id, request_id]
+        [user.user_id, request_id]
       );
 
       return NextResponse.json({ success: true, message: 'تم رفض الطلب' });
@@ -234,6 +239,7 @@ export async function PUT(request) {
 
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Owner Roles PUT Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

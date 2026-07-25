@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord } from '@/lib/db';
 import { calcWithdrawalFee, roundMRU } from '@/lib/fees';
+import { verifySession } from '@/lib/serverAuth';
 
 /**
  * GET /api/wallet?userId=X
+ * Users can only access their own wallet.
  */
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     if (!userId) return NextResponse.json({ error: 'userId مطلوب' }, { status: 400 });
+
+    // Users can only access their own wallet (admins/fms can access any)
+    const isAdmin = ['admin', 'fm', 'ceo'].includes(user.role);
+    if (!isAdmin && user.user_id !== Number(userId)) {
+      return NextResponse.json({ error: 'غير مصرح — لا يمكنك عرض محفظة مستخدم آخر' }, { status: 403 });
+    }
 
     const wallets = await getTable('wallets');
     const wallet = wallets.find(w => w.user_id === Number(userId));
@@ -35,7 +46,7 @@ export async function GET(request) {
     return NextResponse.json({ wallet, transactions, topup_requests, withdrawal_requests });
   } catch (err) {
     console.error('Wallet GET Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
@@ -45,10 +56,19 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { action, userId, amount, sender_name, screenshot_url, bankily_txn_id, notes, owner_id, employee_id } = body;
 
     if (!userId) return NextResponse.json({ error: 'userId مطلوب' }, { status: 400 });
+
+    // Users can only perform actions on their own wallet
+    const isAdmin = ['admin', 'fm', 'ceo'].includes(user.role);
+    if (!isAdmin && user.user_id !== Number(userId)) {
+      return NextResponse.json({ error: 'غير مصرح — يمكنك التعامل مع محفظتك فقط' }, { status: 403 });
+    }
 
     if (action === 'topup') {
       if (!amount || Number(amount) <= 0) return NextResponse.json({ error: 'مبلغ غير صالح' }, { status: 400 });
@@ -63,7 +83,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err) {
     console.error('Wallet POST Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 

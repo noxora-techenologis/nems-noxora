@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import { calcWithdrawalFee } from '@/lib/fees';
+import { getAuthHeaders } from '@/lib/auth';
 
 const BANKILY_NUMBER = '30426837';
 
@@ -76,7 +77,7 @@ export default function WalletModule({ session }) {
   const fetchWallet = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/wallet?userId=${session.user_id}`);
+      const res = await fetch(`/api/wallet?userId=${session.user_id}`, { headers: getAuthHeaders() });
       const data = await res.json();
       setWallet(data.wallet);
       setTransactions(data.transactions || []);
@@ -90,7 +91,7 @@ export default function WalletModule({ session }) {
 
   const fetchAdmin = async () => {
     try {
-      const res = await fetch('/api/wallet/admin');
+      const res = await fetch('/api/wallet/admin', { headers: getAuthHeaders() });
       const data = await res.json();
       setAdminPending(data.pending || []);
       setAdminAll(data.all || []);
@@ -159,7 +160,7 @@ export default function WalletModule({ session }) {
       if (screenshotPreview) {
         const uploadRes = await fetch('/api/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ file: screenshotPreview, filename: `bankily_${bankilyTxnId}.jpg` }),
         });
         const uploadData = await uploadRes.json();
@@ -175,7 +176,7 @@ export default function WalletModule({ session }) {
       // 2. Submit top-up request
       const res = await fetch('/api/wallet', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           action: 'topup',
           userId: session.user_id,
@@ -217,7 +218,7 @@ export default function WalletModule({ session }) {
     try {
       const res = await fetch('/api/wallet', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           action: 'withdraw',
           userId: session.user_id,
@@ -249,7 +250,7 @@ export default function WalletModule({ session }) {
     try {
       const res = await fetch('/api/wallet/admin', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ request_id: requestId, action, approved_by: session.user_id }),
       });
       const result = await res.json();
