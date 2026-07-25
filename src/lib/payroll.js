@@ -84,8 +84,11 @@ export function calculateEmployeePayroll(employee, monthAttendance, monthTasks, 
   }
 
   // --- 4. Absent Hours Deduction ---
+  // Only monthly employees get absent deductions — hourly employees are already
+  // paid only for worked hours (gross = totalHoursWorked × hourlyRate), so
+  // deducting absent hours again would be a double-penalty.
   const hourlyRateForAbsence = salaryType === 'hourly'
-    ? hourlyRate
+    ? 0
     : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
 
   const attendanceDeductions = Math.round(totalAbsentHours * hourlyRateForAbsence * 100) / 100;

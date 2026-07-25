@@ -12,7 +12,7 @@ const STATUS_LABELS = {
 };
 
 const WORK_HOURS_PER_DAY = 8;
-const WORK_DAYS_PER_MONTH = 30;
+const WORK_DAYS_PER_MONTH = 22;
 
 export default function AttendanceModule({ session }) {
   const [attendance, setAttendance] = useState([]);

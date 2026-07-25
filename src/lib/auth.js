@@ -51,7 +51,7 @@ export function requireAuth(router) {
 export const ROLE_MODULES = {
   admin:    ['dashboard', 'users', 'settings', 'logs', 'owners', 'payroll', 'wallet'],
   ceo:      ['dashboard', 'employees', 'attendance', 'projects', 'clients', 'finance', 'owners', 'meetings', 'documents', 'messages', 'reports', 'settings', 'debts', 'payroll', 'wallet'],
-  fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings', 'debts', 'payroll', 'wallet'],
+  fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings', 'debts', 'payroll', 'wallet', 'wallet_admin'],
   hr:       ['dashboard', 'employees', 'attendance', 'meetings', 'reports', 'wallet'],
   pm:       ['dashboard', 'projects', 'clients', 'meetings', 'documents', 'wallet'],
   employee: ['dashboard', 'attendance', 'projects', 'meetings', 'documents', 'messages', 'wallet'],

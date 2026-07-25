@@ -32,7 +32,8 @@ const NAV_ITEMS = {
 
 const ROLE_COLORS = {
   admin: '#8B5CF6', ceo: '#C0392B', fm: '#F39C12',
-  hr: '#27AE60', pm: '#3498DB', employee: '#1ABC9C', owner: '#E67E22'
+  hr: '#27AE60', pm: '#3498DB', employee: '#1ABC9C', owner: '#E67E22',
+  shipping_agent: '#2980B9'
 };
 
 export default function DashboardLayout({ children }) {

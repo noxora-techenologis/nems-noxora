@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, updateRecord, insertRecord } from '@/lib/db';
+import { roundMRU } from '@/lib/fees';
 
 /**
  * POST /api/projects/close
@@ -50,7 +51,7 @@ export async function POST(request) {
         const val = valuations[0];
         const currentRetained = Number(val.retained_earnings) || 0;
         await updateRecord('company_valuation', val.valuation_id, {
-          retained_earnings: currentRetained + companyShare,
+          retained_earnings: roundMRU(currentRetained + companyShare),
           updated_at: now,
         }, Number(userId));
       }
@@ -96,13 +97,13 @@ export async function POST(request) {
 
       // Credit wallet
       const wallets = await getTable('wallets');
-      const wallet = wallets.find(w => wallet => w.wallet_id === inv.wallet_id);
+      const wallet = wallets.find(w => w.wallet_id === inv.wallet_id);
       if (!wallet) continue;
 
-      const newBalance = Number(wallet.balance) + investorProfit;
+      const newBalance = roundMRU(Number(wallet.balance) + investorProfit);
       await updateRecord('wallets', wallet.wallet_id, {
         balance: newBalance,
-        total_earned: Number(wallet.total_earned || 0) + investorProfit,
+        total_earned: roundMRU(Number(wallet.total_earned || 0) + investorProfit),
       }, Number(userId));
 
       // Wallet transaction

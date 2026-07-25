@@ -110,8 +110,6 @@ async function handleTopup(userId, amount, senderName, screenshotUrl, bankilyTxn
 }
 
 async function handleWithdraw(userId, amount, paymentMethod, accountDetails, notes, ownerId, employeeId) {
-  const { calcDepositFee } = await import('@/lib/fees');
-
   const wallets = await getTable('wallets');
   const wallet = wallets.find(w => w.user_id === userId);
 
@@ -144,6 +142,22 @@ async function handleWithdraw(userId, amount, paymentMethod, accountDetails, not
     description: `سحب ${amount} MRU | عمولة: ${feeInfo.fee} MRU | صافي: ${feeInfo.netAmount} MRU | الوسيلة: ${paymentMethod || 'بنكيلي'} | ${accountDetails || ''} — ${notes || ''}`,
     status: 'completed',
   }, userId);
+
+  // Record withdrawal fee as company revenue (same as deposit fees)
+  if (feeInfo.fee > 0) {
+    const today = new Date().toISOString().split('T')[0];
+    await insertRecord('revenues', {
+      amount: feeInfo.fee,
+      title: `عمولة سحب ${amount} MRU`,
+      type: 'عمولة',
+      currency: 'MRU',
+      description: `عمولة ${feeInfo.feePercent * 100}% على سحب ${amount} MRU — المستخدم: #${userId} — الوسيلة: ${paymentMethod || 'بنكيلي'}`,
+      category: 'عمولات',
+      date: today,
+      status: 'approved',
+      created_by: userId || 1,
+    }, userId);
+  }
 
   return NextResponse.json({
     success: true,

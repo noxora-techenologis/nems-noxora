@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, query } from '@/lib/db';
+import { roundMRU } from '@/lib/fees';
 
 // GET: Return current valuation state
 export async function GET() {
@@ -19,8 +20,10 @@ export async function GET() {
 
     const totalRevenue = revenues.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    const totalSalaries = salaries.reduce((s, s2) => s + (Number(s2.net_salary) || 0), 0);
-    const netProfit = totalRevenue - totalExpenses - totalSalaries;
+    // Only count UNPAID salaries — paid salaries are already in expenses table
+    const unpaidSalaries = salaries.filter(s => s.status !== 'paid');
+    const totalUnpaidSalaries = unpaidSalaries.reduce((s, s2) => s + (Number(s2.net_salary) || 0), 0);
+    const netProfit = totalRevenue - totalExpenses - totalUnpaidSalaries;
 
     const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
     const companyValue = capital + retainedEarnings;
@@ -68,16 +71,18 @@ export async function POST() {
 
     const totalRevenue = revenues.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    const totalSalaries = salaries.reduce((s, s2) => s + (Number(s2.net_salary) || 0), 0);
-    const netProfit = totalRevenue - totalExpenses - totalSalaries;
+    // Only count UNPAID salaries — paid salaries are already in expenses table
+    const unpaidSalaries = salaries.filter(s => s.status !== 'paid');
+    const totalUnpaidSalaries = unpaidSalaries.reduce((s, s2) => s + (Number(s2.net_salary) || 0), 0);
+    const netProfit = totalRevenue - totalExpenses - totalUnpaidSalaries;
 
     const undistributed = netProfit - distributedProfit - retainedEarnings;
     if (undistributed <= 0) {
       return NextResponse.json({ error: 'لا توجد أرباح جديدة للتوزيع', net_profit: netProfit, distributed: distributedProfit });
     }
 
-    const toOwners = undistributed * 0.30;
-    const toCompany = undistributed * 0.70;
+    const toOwners = roundMRU(undistributed * 0.30);
+    const toCompany = roundMRU(undistributed * 0.70);
     const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
 
     // Create distribution records for each owner
@@ -86,7 +91,7 @@ export async function POST() {
 
     for (const sh of shares) {
       const ownerPercentage = Number(sh.ownership_percentage) || 0;
-      const ownerAmount = totalShares > 0 ? (toOwners * (Number(sh.total_shares) || 0) / totalShares) : 0;
+      const ownerAmount = totalShares > 0 ? roundMRU(toOwners * (Number(sh.total_shares) || 0) / totalShares) : 0;
 
       await query(
         `INSERT INTO "profit_distributions"
@@ -97,8 +102,8 @@ export async function POST() {
     }
 
     // Update valuation
-    const newRetained = retainedEarnings + toCompany;
-    const newDistributed = distributedProfit + toOwners;
+    const newRetained = roundMRU(retainedEarnings + toCompany);
+    const newDistributed = roundMRU(distributedProfit + toOwners);
     const newCompanyValue = capital + newRetained;
 
     await query(

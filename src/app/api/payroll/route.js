@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query } from '@/lib/db';
 
 const WORK_HOURS_PER_DAY = 8;
-const WORK_DAYS_PER_MONTH = 30;
+const WORK_DAYS_PER_MONTH = 22;
 
 // GET: Calculate payroll for current or specified month
 // GET /api/payroll?month=2026-07&employeeId=1

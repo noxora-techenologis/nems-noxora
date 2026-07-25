@@ -60,6 +60,8 @@ export default function OwnersModule({ session }) {
 
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
+  const isFM = session.role_name.toLowerCase() === 'fm';
+  const canManage = isCEO || isFM;
 
   useEffect(() => {
     fetchData();

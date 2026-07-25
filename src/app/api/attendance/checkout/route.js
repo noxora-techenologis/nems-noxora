@@ -33,7 +33,13 @@ export async function POST(request) {
 
     const totalHours = confirmedSlots;
     const overtimeHours = Math.max(0, totalHours - MAX_SLOTS);
-    const absentHours = Math.max(0, MAX_SLOTS - confirmedSlots);
+    let absentHours = Math.max(0, MAX_SLOTS - confirmedSlots);
+
+    // RULE: If confirmed slots < 2, entire day counts as absent (8 hrs)
+    // This must match payroll.js engine behavior
+    if (confirmedSlots < MIN_SLOTS_REQUIRED) {
+      absentHours = MAX_SLOTS;
+    }
 
     let status = 'present';
     let statusMessage = '';
