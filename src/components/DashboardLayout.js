@@ -27,6 +27,7 @@ const NAV_ITEMS = {
   debts:      { icon: '📑', label: 'ديون ومستحقات', path: '/debts' },
   payroll:    { icon: '💰', label: 'الرواتب', path: '/payroll' },
   wallet:     { icon: '🏦', label: 'المحفظة', path: '/wallet' },
+  wallet_admin: { icon: '🔧', label: 'إدارة الشحن', path: '/wallet_admin' },
 };
 
 const ROLE_COLORS = {

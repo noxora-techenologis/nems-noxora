@@ -31,6 +31,7 @@ const ALL_POSITIONS = [
   { code: 'SECURITY', name: 'أمن', group: 'تشغيلية وخدمات مساندة' },
   { code: 'DRIVER', name: 'سائق', group: 'تشغيلية وخدمات مساندة' },
   { code: 'EMPLOYEE', name: 'موظف عام', group: 'تشغيلية وخدمات مساندة' },
+  { code: 'SHIPPING_AGENT', name: 'وكيل الشحن', group: 'تشغيلية وخدمات مساندة' },
 ];
 
 // GET: List all positions + owner's current roles + pending requests

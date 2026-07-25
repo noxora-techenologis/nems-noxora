@@ -56,6 +56,7 @@ export const ROLE_MODULES = {
   pm:       ['dashboard', 'projects', 'clients', 'meetings', 'documents', 'wallet'],
   employee: ['dashboard', 'attendance', 'projects', 'meetings', 'documents', 'messages', 'wallet'],
   owner:    ['dashboard', 'owners', 'reports', 'debts', 'payroll', 'wallet'],
+  shipping_agent: ['dashboard', 'wallet', 'wallet_admin'],
 };
 
 // Normalize role string or Arabic role title into valid role key
@@ -68,6 +69,7 @@ export function normalizeRoleKey(role) {
   if (r.includes('hr') || r.includes('موارد') || r.includes('الموارد البشرية')) return 'hr';
   if (r.includes('pm') || r.includes('مشاريع') || r.includes('مدير المشاريع')) return 'pm';
   if (r.includes('owner') || r.includes('مالك') || r.includes('ملاك') || r.includes('أسهم')) return 'owner';
+  if (r.includes('shipping') || r.includes('شحن') || r.includes('وكيل')) return 'shipping_agent';
   return 'employee';
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { calcWithdrawalFee } from '@/lib/fees';
 
 const BANKILY_NUMBER = '30426837';
 
@@ -43,6 +44,19 @@ export default function WalletModule({ session }) {
   // Withdraw form
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawNotes, setWithdrawNotes] = useState('');
+  const [withdrawMethod, setWithdrawMethod] = useState('');
+  const [withdrawAccount, setWithdrawAccount] = useState('');
+
+  const PAYMENT_METHODS = [
+    { value: 'bankily', label: 'بنكيلي', placeholder: 'رقم بنكيلي...' },
+    { value: 'bank_account', label: 'حساب بنكي', placeholder: 'رقم الحساب البنكي + اسم البنك...' },
+    { value: 'paypal', label: 'بايبال', placeholder: 'البريد الإلكتروني لحساب بايبال...' },
+    { value: 'binance', label: 'بينانس', placeholder: 'معرف بينانس (UID)...' },
+  ];
+
+  const withdrawFeeInfo = withdrawAmount && Number(withdrawAmount) > 0
+    ? calcWithdrawalFee(Number(withdrawAmount))
+    : null;
 
   useEffect(() => {
     const handleCurrChange = () => setCurrTick(t => t + 1);
@@ -208,6 +222,8 @@ export default function WalletModule({ session }) {
           action: 'withdraw',
           userId: session.user_id,
           amount,
+          payment_method: withdrawMethod || null,
+          account_details: withdrawAccount || null,
           notes: withdrawNotes || null,
           owner_id: session.owner_id || null,
           employee_id: session.employee_id || null,
@@ -580,16 +596,104 @@ export default function WalletModule({ session }) {
               <div style={{ padding: '12px', background: 'rgba(241,196,15,0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(241,196,15,0.3)', fontSize: '13px', fontWeight: 700 }}>
                 الرصيد المتاح: <span style={{ color: 'var(--noxora-yellow)' }}>{formatCurrency(wallet?.balance || 0)} MRU</span>
               </div>
+
+              {/* Amount */}
               <div className="form-group">
-                <label className="form-label">المبلغ المطلوب سحبه (MRU)</label>
-                <input type="number" className="form-input" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="0" required min="1" max={wallet?.balance || 0} />
+                <label className="form-label" style={{ fontWeight: 800 }}>المبلغ المطلوب سحبه (MRU) *</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={withdrawAmount}
+                  onChange={e => setWithdrawAmount(e.target.value)}
+                  placeholder="0"
+                  required
+                  min="1"
+                  max={wallet?.balance || 0}
+                  style={{ fontSize: '16px', fontWeight: 700 }}
+                />
               </div>
+
+              {/* Payment Method */}
               <div className="form-group">
-                <label className="form-label">ملاحظات (رقم الحساب / وسيلة السحب)</label>
-                <input type="text" className="form-input" value={withdrawNotes} onChange={e => setWithdrawNotes(e.target.value)} placeholder="رقم الحساب البنكي أو رقم بنكيلي..." />
+                <label className="form-label" style={{ fontWeight: 800 }}>وسيلة السحب *</label>
+                <select
+                  className="form-input"
+                  value={withdrawMethod}
+                  onChange={e => {
+                    setWithdrawMethod(e.target.value);
+                    setWithdrawAccount('');
+                  }}
+                  required
+                  style={{ fontSize: '14px' }}
+                >
+                  <option value="">اختر وسيلة السحب...</option>
+                  {PAYMENT_METHODS.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
               </div>
-              <button type="submit" className="btn btn-danger" disabled={submitting} style={{ alignSelf: 'flex-start' }}>
-                {submitting ? '⏳ جاري...' : '💸 سحب المبلغ'}
+
+              {/* Account Details — dynamic placeholder */}
+              {withdrawMethod && (
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 800 }}>
+                    {PAYMENT_METHODS.find(m => m.value === withdrawMethod)?.label} — بيانات الحساب *
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={withdrawAccount}
+                    onChange={e => setWithdrawAccount(e.target.value)}
+                    placeholder={PAYMENT_METHODS.find(m => m.value === withdrawMethod)?.placeholder || 'أدخل بيانات الحساب...'}
+                    required
+                    style={{ fontSize: '14px' }}
+                  />
+                </div>
+              )}
+
+              {/* Notes (optional) */}
+              <div className="form-group">
+                <label className="form-label">ملاحظات إضافية (اختياري)</label>
+                <input type="text" className="form-input" value={withdrawNotes} onChange={e => setWithdrawNotes(e.target.value)} placeholder="أي ملاحظات إضافية..." style={{ fontSize: '13px' }} />
+              </div>
+
+              {/* Live Fee Calculation */}
+              {withdrawFeeInfo && (
+                <div style={{
+                  padding: '14px', borderRadius: 'var(--radius-md)',
+                  background: withdrawFeeInfo.fee > 0 ? 'rgba(243,156,18,0.08)' : 'rgba(39,174,96,0.08)',
+                  border: `1px solid ${withdrawFeeInfo.fee > 0 ? 'rgba(243,156,18,0.3)' : 'rgba(39,174,96,0.3)'}`,
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', color: 'var(--text-primary)' }}>
+                    حساب العمولة — {withdrawFeeInfo.tier}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+                    <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ color: 'var(--text-muted)' }}>المبلغ المطلوب</div>
+                      <div style={{ fontWeight: 800 }}>{formatCurrency(Number(withdrawAmount))} MRU</div>
+                    </div>
+                    <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ color: 'var(--text-muted)' }}>عمولة السحب ({withdrawFeeInfo.feePercent * 100}%)</div>
+                      <div style={{ fontWeight: 800, color: 'var(--danger)' }}>-{formatCurrency(withdrawFeeInfo.fee)} MRU</div>
+                    </div>
+                    <div style={{ padding: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', gridColumn: '1 / -1' }}>
+                      <div style={{ color: 'var(--text-muted)' }}>المبلغ الذي سيصلك فعلياً</div>
+                      <div style={{ fontWeight: 900, fontSize: '16px', color: 'var(--success)' }}>{formatCurrency(withdrawFeeInfo.netAmount)} MRU</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-danger"
+                disabled={submitting || !withdrawMethod || !withdrawAccount || !withdrawAmount}
+                style={{
+                  alignSelf: 'flex-start',
+                  opacity: (submitting || !withdrawMethod || !withdrawAccount || !withdrawAmount) ? 0.5 : 1,
+                }}
+              >
+                {submitting ? '⏳ جاري...' : withdrawFeeInfo ? `💸 سحب ${formatCurrency(withdrawFeeInfo.netAmount)} MRU` : '💸 سحب المبلغ'}
               </button>
             </form>
           </div>

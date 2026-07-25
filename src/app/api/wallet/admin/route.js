@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getTable, updateRecord, insertRecord } from '@/lib/db';
+import { calcDepositFee, roundMRU } from '@/lib/fees';
 
 /**
  * GET /api/wallet/admin
- * Returns all top-up requests for FM review.
+ * Returns all top-up requests for shipping agent / FM review.
  */
 export async function GET() {
   try {
@@ -50,27 +51,51 @@ export async function PUT(request) {
     }
 
     if (action === 'approve') {
+      // Calculate deposit fee
+      const feeInfo = calcDepositFee(Number(topup.amount));
+      const creditedAmount = feeInfo.creditedAmount;
+
       const wallets = await getTable('wallets');
       const wallet = wallets.find(w => w.wallet_id === topup.wallet_id);
       if (!wallet) return NextResponse.json({ error: 'المحفظة غير موجودة' }, { status: 404 });
 
-      const newBalance = Number(wallet.balance) + Number(topup.amount);
+      const newBalance = roundMRU(Number(wallet.balance) + creditedAmount);
 
       await updateRecord('wallets', wallet.wallet_id, {
         balance: newBalance,
-        total_deposited: Number(wallet.total_deposited || 0) + Number(topup.amount),
+        total_deposited: roundMRU(Number(wallet.total_deposited || 0) + creditedAmount),
       }, approved_by || 1);
+
+      // Record the deposit with fee info
+      const feeNote = feeInfo.fee > 0
+        ? ` | عمولة الإيداع: ${feeInfo.fee} MRU (${feeInfo.tier}) | صافي الشحن: ${creditedAmount} MRU`
+        : ` | بدون عمولة | الشحن كاملاً: ${creditedAmount} MRU`;
 
       await insertRecord('wallet_transactions', {
         wallet_id: wallet.wallet_id,
         type: 'deposit',
-        amount: Number(topup.amount),
+        amount: creditedAmount,
         balance_after: newBalance,
         reference_type: 'topup_request',
         reference_id: topup.request_id,
-        description: `شحن المحفظة via بنكيلي — ${topup.sender_name || ''} — رقم المعاملة: ${topup.bankily_txn_id || 'N/A'}`,
+        description: `شحن المحفظة via بنكيلي — المرسِل: ${topup.sender_name || ''} — رقم المعاملة: ${topup.bankily_txn_id || 'N/A'} — المبلغ الأصلي: ${topup.amount} MRU${feeNote}`,
         status: 'completed',
       }, approved_by || 1);
+
+      // If there's a fee, record it as a company revenue
+      if (feeInfo.fee > 0) {
+        await insertRecord('revenues', {
+          amount: feeInfo.fee,
+          title: `عمولة إيداع ${topup.amount} MRU — ${topup.sender_name || ''}`,
+          type: 'عمولة',
+          currency: 'MRU',
+          description: `عمولة ${feeInfo.feePercent * 100}% على إيداع ${topup.amount} MRU — المستخدم: #${topup.user_id}`,
+          category: 'عمولات',
+          date: new Date().toISOString().split('T')[0],
+          status: 'approved',
+          created_by: approved_by || 1,
+        }, approved_by || 1);
+      }
 
       await updateRecord('topup_requests', topup.request_id, {
         status: 'approved',
@@ -78,10 +103,16 @@ export async function PUT(request) {
         approved_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
       }, approved_by || 1);
 
+      const feeMsg = feeInfo.fee > 0
+        ? ` (العمولة: ${feeInfo.fee} MRU، الصافي: ${creditedAmount} MRU)`
+        : ` (بدون عمولة)`;
+
       return NextResponse.json({
         success: true,
-        message: `تم شحن ${topup.amount} MRU في المحفظة بنجاح. الرصيد الجديد: ${newBalance} MRU`,
+        message: `تم شحن ${creditedAmount} MRU في المحفظة بنجاح${feeMsg}. الرصيد الجديد: ${newBalance} MRU`,
         new_balance: newBalance,
+        fee: feeInfo.fee,
+        credited_amount: creditedAmount,
       });
     }
 
