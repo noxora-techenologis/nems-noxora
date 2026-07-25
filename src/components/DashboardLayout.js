@@ -26,6 +26,7 @@ const NAV_ITEMS = {
   logs:       { icon: '📋', label: 'سجل النظام', path: '/logs' },
   debts:      { icon: '📑', label: 'ديون ومستحقات', path: '/debts' },
   payroll:    { icon: '💰', label: 'الرواتب', path: '/payroll' },
+  wallet:     { icon: '🏦', label: 'المحفظة', path: '/wallet' },
 };
 
 const ROLE_COLORS = {

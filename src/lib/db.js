@@ -15,7 +15,9 @@ export const SAFE_TABLES = new Set([
   'conversation_members', 'messages', 'files', 'project_documents',
   'file_versions', 'announcements', 'notifications', 'feedback_reports',
   'audit_log', 'system_settings', 'position_requests', 'permissions',
-  'role_permissions', 'company_valuation', 'company_debts', 'withdrawal_requests'
+  'role_permissions', 'company_valuation', 'company_debts', 'withdrawal_requests',
+  'wallets', 'wallet_transactions', 'topup_requests',
+  'project_investments', 'project_proposals', 'project_votes'
 ]);
 
 const PRIMARY_KEYS = {
@@ -33,7 +35,11 @@ const PRIMARY_KEYS = {
   feedback_reports: 'id', audit_log: 'log_id', system_settings: 'setting_id',
   position_requests: 'request_id', permissions: 'permission_id',
   role_permissions: 'id', company_valuation: 'valuation_id', company_debts: 'debt_id',
-  withdrawal_requests: 'request_id'
+  withdrawal_requests: 'request_id',
+  wallets: 'wallet_id', wallet_transactions: 'transaction_id',
+  topup_requests: 'request_id',
+  project_investments: 'investment_id', project_proposals: 'proposal_id',
+  project_votes: 'vote_id'
 };
 
 const MODULE_MAP = {
@@ -52,7 +58,9 @@ const MODULE_MAP = {
   company_debts: 'Debts',
   withdrawal_requests: 'Owners',
   notifications: 'System', feedback_reports: 'System', audit_log: 'System', system_settings: 'System',
-  company_valuation: 'Shares'
+  company_valuation: 'Shares',
+  wallets: 'Wallet', wallet_transactions: 'Wallet', topup_requests: 'Wallet',
+  project_investments: 'Projects', project_proposals: 'Projects', project_votes: 'Projects'
 };
 
 let pool = null;

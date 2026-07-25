@@ -49,13 +49,13 @@ export function requireAuth(router) {
 
 // Role-based access control
 export const ROLE_MODULES = {
-  admin:    ['dashboard', 'users', 'settings', 'logs', 'owners', 'payroll'],
-  ceo:      ['dashboard', 'employees', 'attendance', 'projects', 'clients', 'finance', 'owners', 'meetings', 'documents', 'messages', 'reports', 'settings', 'debts', 'payroll'],
-  fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings', 'debts', 'payroll'],
-  hr:       ['dashboard', 'employees', 'attendance', 'meetings', 'reports'],
-  pm:       ['dashboard', 'projects', 'clients', 'meetings', 'documents'],
-  employee: ['dashboard', 'attendance', 'projects', 'meetings', 'documents', 'messages'],
-  owner:    ['dashboard', 'owners', 'reports', 'debts', 'payroll'],
+  admin:    ['dashboard', 'users', 'settings', 'logs', 'owners', 'payroll', 'wallet'],
+  ceo:      ['dashboard', 'employees', 'attendance', 'projects', 'clients', 'finance', 'owners', 'meetings', 'documents', 'messages', 'reports', 'settings', 'debts', 'payroll', 'wallet'],
+  fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings', 'debts', 'payroll', 'wallet'],
+  hr:       ['dashboard', 'employees', 'attendance', 'meetings', 'reports', 'wallet'],
+  pm:       ['dashboard', 'projects', 'clients', 'meetings', 'documents', 'wallet'],
+  employee: ['dashboard', 'attendance', 'projects', 'meetings', 'documents', 'messages', 'wallet'],
+  owner:    ['dashboard', 'owners', 'reports', 'debts', 'payroll', 'wallet'],
 };
 
 // Normalize role string or Arabic role title into valid role key
