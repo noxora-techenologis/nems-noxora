@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+
+const BANKILY_NUMBER = '30426837';
 
 const TXN_TYPES = {
   deposit: { label: 'إيداع', icon: '💵', color: 'var(--success)' },
@@ -28,12 +30,15 @@ export default function WalletModule({ session }) {
   const [activeTab, setActiveTab] = useState('balance');
   const [, setCurrTick] = useState(0);
 
-  // Top-up form
+  // Top-up form — Bankily
   const [topupAmount, setTopupAmount] = useState('');
-  const [topupMethod, setTopupMethod] = useState('بنكيلي');
-  const [topupProof, setTopupProof] = useState('');
-  const [topupNotes, setTopupNotes] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [screenshotPreview, setScreenshotPreview] = useState('');
+  const [screenshotFile, setScreenshotFile] = useState(null);
+  const [bankilyTxnId, setBankilyTxnId] = useState('');
+  const [txnIdError, setTxnIdError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Withdraw form
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -48,7 +53,6 @@ export default function WalletModule({ session }) {
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
   const role = session.role_name?.toLowerCase() || '';
   const isFM = role === 'fm';
-  const isAdmin = role === 'admin';
 
   useEffect(() => {
     fetchWallet();
@@ -81,26 +85,90 @@ export default function WalletModule({ session }) {
     }
   };
 
+  // Validate 19-digit transaction ID
+  const validateTxnId = (val) => {
+    setBankilyTxnId(val);
+    if (!val) {
+      setTxnIdError('');
+      return;
+    }
+    if (!/^\d+$/.test(val)) {
+      setTxnIdError('يجب أن يحتوي على أرقام فقط');
+    } else if (val.length !== 19) {
+      setTxnIdError(`المطلوب 19 رقماً — المدخل: ${val.length} رقم`);
+    } else {
+      setTxnIdError('');
+    }
+  };
+
+  // Handle screenshot file selection
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('يرجى اختيار صورة فقط');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('حجم الصورة يجب أن يكون أقل من 5MB');
+      return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setScreenshotPreview(reader.result);
+      setScreenshotFile(file);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const isFormValid = () => {
+    return topupAmount && Number(topupAmount) > 0
+      && senderName.trim()
+      && screenshotPreview
+      && bankilyTxnId.length === 19 && /^\d{19}$/.test(bankilyTxnId)
+      && !txnIdError;
+  };
+
   const handleTopup = async (e) => {
     e.preventDefault();
-    const amount = Number(topupAmount);
-    if (!amount || amount <= 0) {
-      alert('يرجى إدخال مبلغ صحيح');
+    if (!isFormValid()) {
+      alert('يرجى تعبئة جميع الحقول بشكل صحيح');
       return;
     }
 
     setSubmitting(true);
     try {
+      // 1. Upload screenshot
+      let screenshotUrl = '';
+      if (screenshotPreview) {
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: screenshotPreview, filename: `bankily_${bankilyTxnId}.jpg` }),
+        });
+        const uploadData = await uploadRes.json();
+        if (uploadData.url) {
+          screenshotUrl = uploadData.url;
+        } else {
+          alert('فشل رفع الصورة');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // 2. Submit top-up request
       const res = await fetch('/api/wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'topup',
           userId: session.user_id,
-          amount,
-          payment_method: topupMethod,
-          proof_url: topupProof || null,
-          notes: topupNotes || null,
+          amount: Number(topupAmount),
+          sender_name: senderName.trim(),
+          screenshot_url: screenshotUrl,
+          bankily_txn_id: bankilyTxnId,
           owner_id: session.owner_id || null,
           employee_id: session.employee_id || null,
         }),
@@ -109,8 +177,10 @@ export default function WalletModule({ session }) {
       if (result.success) {
         alert(result.message);
         setTopupAmount('');
-        setTopupProof('');
-        setTopupNotes('');
+        setSenderName('');
+        setScreenshotPreview('');
+        setScreenshotFile(null);
+        setBankilyTxnId('');
         fetchWallet();
       } else {
         alert(result.error || 'فشلت العملية');
@@ -125,15 +195,8 @@ export default function WalletModule({ session }) {
   const handleWithdraw = async (e) => {
     e.preventDefault();
     const amount = Number(withdrawAmount);
-    if (!amount || amount <= 0) {
-      alert('يرجى إدخال مبلغ صحيح');
-      return;
-    }
-    if (!wallet || Number(wallet.balance) < amount) {
-      alert('الرصيد غير كافٍ');
-      return;
-    }
-
+    if (!amount || amount <= 0) { alert('يرجى إدخال مبلغ صحيح'); return; }
+    if (!wallet || Number(wallet.balance) < amount) { alert('الرصيد غير كافٍ'); return; }
     if (!confirm(`هل أنت متأكد من سحب ${amount} MRU من محفظتك؟`)) return;
 
     setSubmitting(true);
@@ -171,19 +234,11 @@ export default function WalletModule({ session }) {
       const res = await fetch('/api/wallet/admin', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          request_id: requestId,
-          action,
-          approved_by: session.user_id,
-        }),
+        body: JSON.stringify({ request_id: requestId, action, approved_by: session.user_id }),
       });
       const result = await res.json();
-      if (result.success) {
-        alert(result.message);
-        fetchAdmin();
-      } else {
-        alert(result.error || 'فشلت العملية');
-      }
+      if (result.success) { alert(result.message); fetchAdmin(); }
+      else { alert(result.error || 'فشلت العملية'); }
     } catch {
       alert('تعذر الاتصال بالخادم');
     }
@@ -210,18 +265,10 @@ export default function WalletModule({ session }) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-primary)', paddingBottom: '12px', flexWrap: 'wrap' }}>
-        <button className={`btn ${activeTab === 'balance' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('balance')}>
-          💰 الرصيد
-        </button>
-        <button className={`btn ${activeTab === 'transactions' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('transactions')}>
-          📋 السجل
-        </button>
-        <button className={`btn ${activeTab === 'topup' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('topup')}>
-          ⬆️ شحن المحفظة
-        </button>
-        <button className={`btn ${activeTab === 'withdraw' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('withdraw')}>
-          ⬇️ السحب
-        </button>
+        <button className={`btn ${activeTab === 'balance' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('balance')}>💰 الرصيد</button>
+        <button className={`btn ${activeTab === 'transactions' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('transactions')}>📋 السجل</button>
+        <button className={`btn ${activeTab === 'topup' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('topup')}>⬆️ شحن المحفظة</button>
+        <button className={`btn ${activeTab === 'withdraw' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('withdraw')}>⬇️ السحب</button>
         {isFM && (
           <button className={`btn ${activeTab === 'admin' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setActiveTab('admin'); fetchAdmin(); }}>
             🔧 إدارة الشحن ({adminPending.length})
@@ -259,8 +306,6 @@ export default function WalletModule({ session }) {
               <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--success)' }}>{formatCurrency(wallet?.total_earned || 0)}</div>
             </div>
           </div>
-
-          {/* Quick Stats */}
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="stat-card">
               <div className="stat-value" style={{ fontSize: '16px' }}>{transactions.length}</div>
@@ -300,24 +345,17 @@ export default function WalletModule({ session }) {
                       <span style={{ fontSize: '24px' }}>{typeInfo.icon}</span>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '13px' }}>{typeInfo.label}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {txn.description}
-                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{txn.description}</div>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                           {new Date(txn.created_at).toLocaleDateString('ar-SA')} {new Date(txn.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{
-                        fontWeight: 900, fontSize: '15px',
-                        color: ['deposit', 'roi', 'salary'].includes(txn.type) ? 'var(--success)' : 'var(--danger)',
-                      }}>
+                      <div style={{ fontWeight: 900, fontSize: '15px', color: ['deposit', 'roi', 'salary'].includes(txn.type) ? 'var(--success)' : 'var(--danger)' }}>
                         {['deposit', 'roi', 'salary'].includes(txn.type) ? '+' : '-'}{formatCurrency(txn.amount)}
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                        الرصيد: {formatCurrency(txn.balance_after)}
-                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>الرصيد: {formatCurrency(txn.balance_after)}</div>
                     </div>
                   </div>
                 );
@@ -327,70 +365,181 @@ export default function WalletModule({ session }) {
         </div>
       )}
 
-      {/* Top-Up Tab */}
+      {/* ===================== TOPUP TAB — BANKILY ===================== */}
       {activeTab === 'topup' && (
-        <div className="grid-2">
-          {/* Top-Up Form */}
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+          {/* Company Bankily Number — PROMINENT */}
+          <div style={{
+            padding: '20px', borderRadius: 'var(--radius-lg)',
+            background: 'linear-gradient(135deg, #009944 0%, #00b359 100%)',
+            color: '#fff', textAlign: 'center', marginBottom: '20px',
+            boxShadow: '0 4px 20px rgba(0,153,68,0.3)',
+          }}>
+            <div style={{ fontSize: '13px', opacity: 0.9, marginBottom: '6px' }}>📱 قم بالتحويل إلى رقم بنكيلي الخاص بالشركة</div>
+            <div style={{
+              fontSize: '32px', fontWeight: 900, letterSpacing: '4px',
+              fontFamily: 'monospace', textShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}>
+              {BANKILY_NUMBER}
+            </div>
+            <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '8px' }}>
+              احتفظ بلقطة الشاشة وإشعار التحويل لإرفاقه بالطلب
+            </div>
+          </div>
+
+          {/* Deposit Form */}
           <div className="card">
             <div className="card-header">
-              <h2 className="card-title">⬆️ شحن المحفظة</h2>
+              <h2 className="card-title">⬆️ طلب شحن المحفظة</h2>
             </div>
-            <form onSubmit={handleTopup} style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '0 16px 16px' }}>
-              <div className="form-group">
-                <label className="form-label">المبلغ (MRU)</label>
+            <form onSubmit={handleTopup} style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '0 20px 20px' }}>
+
+              {/* Amount */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontWeight: 800 }}>المبلغ (MRU) *</label>
                 <input
                   type="number"
                   className="form-input"
                   value={topupAmount}
                   onChange={e => setTopupAmount(e.target.value)}
-                  placeholder="أدخل المبلغ..."
+                  placeholder="أدخل المبلغ المراد شحنه..."
                   required
                   min="1"
+                  style={{ fontSize: '16px', padding: '12px', fontWeight: 700 }}
                 />
               </div>
-              <div className="form-group">
-                <label className="form-label">طريقة الدفع</label>
-                <select className="form-select" value={topupMethod} onChange={e => setTopupMethod(e.target.value)}>
-                  <option value="بنكيلي">بنكيلي</option>
-                  <option value="تحويل بنكي">تحويل بنكي</option>
-                  <option value="محفظة إلكترونية">محفظة إلكترونية</option>
-                  <option value="كاش">كاش</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">إثبات التحويل (رابط صورة / لقطة شاشة)</label>
+
+              {/* Sender Name */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontWeight: 800 }}>اسم صاحب الحساب المرسِل *</label>
                 <input
                   type="text"
                   className="form-input"
-                  value={topupProof}
-                  onChange={e => setTopupProof(e.target.value)}
-                  placeholder="الصق رابط الإثبات هنا..."
+                  value={senderName}
+                  onChange={e => setSenderName(e.target.value)}
+                  placeholder="الاسم الكامل كما هو في حساب بنكيلي..."
+                  required
+                  style={{ fontSize: '14px', padding: '12px' }}
                 />
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  الاسم الذي قام بالتحويل من تطبيقه
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">ملاحظات</label>
+
+              {/* Screenshot Upload */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontWeight: 800 }}>لقطة شاشة إشعار التحويل *</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelect}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: '100%', padding: '20px', borderRadius: 'var(--radius-md)',
+                    border: screenshotPreview ? '2px solid var(--success)' : '2px dashed var(--border-accent)',
+                    background: screenshotPreview ? 'rgba(39,174,96,0.05)' : 'var(--bg-secondary)',
+                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                  }}
+                >
+                  {screenshotPreview ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ fontSize: '20px' }}>✅</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--success)' }}>تم رفع الصورة بنجاح — اضغط للتغيير</div>
+                      <img src={screenshotPreview} alt="Screenshot" style={{ maxHeight: '120px', borderRadius: 'var(--radius-sm)', objectFit: 'contain' }} />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '32px' }}>📸</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>اضغط لرفع لقطة الشاشة</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الكاميرا أو الاستوديو — PNG/JPG — حد أقصى 5MB</div>
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              {/* Transaction ID — 19 digits */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontWeight: 800 }}>الرقم التسلسلي للمعاملة (Transaction ID) *</label>
                 <input
                   type="text"
                   className="form-input"
-                  value={topupNotes}
-                  onChange={e => setTopupNotes(e.target.value)}
-                  placeholder="رقم الحساب أو أي ملاحظات..."
+                  value={bankilyTxnId}
+                  onChange={e => validateTxnId(e.target.value.replace(/\D/g, '').slice(0, 19))}
+                  placeholder="أدخل الرقم التسلسلي المكون من 19 رقماً..."
+                  required
+                  maxLength={19}
+                  inputMode="numeric"
+                  pattern="\d{19}"
+                  style={{
+                    fontSize: '16px', padding: '12px', fontFamily: 'monospace', letterSpacing: '2px',
+                    border: txnIdError ? '2px solid var(--danger)' : bankilyTxnId.length === 19 ? '2px solid var(--success)' : undefined,
+                  }}
+                />
+                {txnIdError && (
+                  <div style={{ fontSize: '12px', color: 'var(--danger)', fontWeight: 700, marginTop: '6px', padding: '6px 10px', background: 'rgba(192,57,43,0.08)', borderRadius: 'var(--radius-sm)' }}>
+                    ⚠️ {txnIdError}
+                  </div>
+                )}
+                {bankilyTxnId.length === 19 && !txnIdError && (
+                  <div style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 700, marginTop: '6px' }}>
+                    ✅ الرقم التسلسلي صحيح — 19 رقماً
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  مكتوب في إشعار التحويل بنكيلي — 19 رقماً بالضبط
+                </div>
+              </div>
+
+              {/* Notes (optional) */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">ملاحظات إضافية (اختياري)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={withdrawNotes}
+                  onChange={e => {}}
+                  placeholder="أي ملاحظات إضافية..."
+                  style={{ fontSize: '13px' }}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!isFormValid() || submitting}
+                style={{
+                  width: '100%', padding: '14px', fontSize: '16px', fontWeight: 800,
+                  opacity: (!isFormValid() || submitting) ? 0.5 : 1,
+                }}
+              >
                 {submitting ? '⏳ جاري الإرسال...' : '📤 إرسال طلب الشحن'}
               </button>
+
+              {/* Validation Summary */}
+              {!isFormValid() && (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+                  {!topupAmount && '• أدخل المبلغ\n'}
+                  {!senderName.trim() && '• أدخل اسم صاحب الحساب\n'}
+                  {!screenshotPreview && '• ارفع لقطة شاشة\n'}
+                  {bankilyTxnId.length !== 19 && '• الرقم التسلسلي يجب أن يكون 19 رقماً\n'}
+                </div>
+              )}
             </form>
           </div>
 
-          {/* My Top-Up Requests */}
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">طلبات الشحن ({topupRequests.length})</h2>
-            </div>
-            {topupRequests.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد طلبات شحن</div>
-            ) : (
+          {/* My Requests */}
+          {topupRequests.length > 0 && (
+            <div className="card" style={{ marginTop: '16px' }}>
+              <div className="card-header">
+                <h2 className="card-title">طلبات الشحن ({topupRequests.length})</h2>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
                 {topupRequests.map(req => (
                   <div key={req.request_id} style={{
@@ -408,14 +557,15 @@ export default function WalletModule({ session }) {
                       </span>
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      {req.payment_method} — {new Date(req.created_at).toLocaleDateString('ar-SA')}
+                      {req.sender_name && <>المرسِل: {req.sender_name} | </>}
+                      {req.bankily_txn_id && <>رقم المعاملة: {req.bankily_txn_id} | </>}
+                      {new Date(req.created_at).toLocaleDateString('ar-SA')}
                     </div>
-                    {req.notes && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{req.notes}</div>}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -432,34 +582,17 @@ export default function WalletModule({ session }) {
               </div>
               <div className="form-group">
                 <label className="form-label">المبلغ المطلوب سحبه (MRU)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={withdrawAmount}
-                  onChange={e => setWithdrawAmount(e.target.value)}
-                  placeholder="0"
-                  required
-                  min="1"
-                  max={wallet?.balance || 0}
-                />
+                <input type="number" className="form-input" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="0" required min="1" max={wallet?.balance || 0} />
               </div>
               <div className="form-group">
                 <label className="form-label">ملاحظات (رقم الحساب / وسيلة السحب)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={withdrawNotes}
-                  onChange={e => setWithdrawNotes(e.target.value)}
-                  placeholder="رقم الحساب البنكي أو رقم بنكيلي..."
-                />
+                <input type="text" className="form-input" value={withdrawNotes} onChange={e => setWithdrawNotes(e.target.value)} placeholder="رقم الحساب البنكي أو رقم بنكيلي..." />
               </div>
               <button type="submit" className="btn btn-danger" disabled={submitting} style={{ alignSelf: 'flex-start' }}>
                 {submitting ? '⏳ جاري...' : '💸 سحب المبلغ'}
               </button>
             </form>
           </div>
-
-          {/* Recent Withdrawals */}
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">آخر عمليات السحب</h2>
@@ -476,9 +609,7 @@ export default function WalletModule({ session }) {
                   }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: '13px' }}>💸 سحب</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {new Date(txn.created_at).toLocaleDateString('ar-SA')}
-                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(txn.created_at).toLocaleDateString('ar-SA')}</div>
                       <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{txn.description}</div>
                     </div>
                     <div style={{ fontWeight: 900, fontSize: '15px', color: 'var(--danger)' }}>-{formatCurrency(txn.amount)}</div>
@@ -490,7 +621,7 @@ export default function WalletModule({ session }) {
         </div>
       )}
 
-      {/* Admin Tab (FM only) */}
+      {/* ===================== ADMIN TAB (FM only) ===================== */}
       {activeTab === 'admin' && isFM && (
         <div>
           <div className="card" style={{ marginBottom: '20px' }}>
@@ -498,43 +629,78 @@ export default function WalletModule({ session }) {
               <h2 className="card-title">🔧 طلبات الشحن المعلقة ({adminPending.length})</h2>
             </div>
             {adminPending.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد طلبات معلقة — كل شيء محدّث ✅</div>
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد طلبات معلقة</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
                 {adminPending.map(req => (
                   <div key={req.request_id} style={{
-                    padding: '16px', borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-secondary)', border: '1px solid var(--border-warning)',
+                    padding: '20px', borderRadius: 'var(--radius-lg)',
+                    background: 'var(--bg-secondary)', border: '2px solid var(--border-warning)',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                       <div>
-                        <div style={{ fontWeight: 800, fontSize: '14px' }}>طلب #{req.request_id}</div>
+                        <div style={{ fontWeight: 800, fontSize: '15px' }}>طلب #{req.request_id}</div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>المستخدم: #{req.user_id}</div>
                       </div>
-                      <div style={{ fontWeight: 900, fontSize: '18px', color: 'var(--success)' }}>{formatCurrency(req.amount)} MRU</div>
+                      <div style={{ fontWeight: 900, fontSize: '22px', color: 'var(--success)' }}>{formatCurrency(req.amount)} MRU</div>
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                      الطريقة: {req.payment_method} | التاريخ: {new Date(req.created_at).toLocaleDateString('ar-SA')}
+
+                    {/* Details Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px', fontSize: '12px' }}>
+                      <div style={{ padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>اسم المرسِل</div>
+                        <div style={{ fontWeight: 700 }}>{req.sender_name || '—'}</div>
+                      </div>
+                      <div style={{ padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>رقم المعاملة</div>
+                        <div style={{ fontWeight: 700, fontFamily: 'monospace', letterSpacing: '1px' }}>{req.bankily_txn_id || '—'}</div>
+                      </div>
+                      <div style={{ padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>طريقة الدفع</div>
+                        <div style={{ fontWeight: 700 }}>بنكيلي</div>
+                      </div>
+                      <div style={{ padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                        <div style={{ color: 'var(--text-muted)', marginBottom: '2px' }}>التاريخ</div>
+                        <div style={{ fontWeight: 700 }}>{new Date(req.created_at).toLocaleDateString('ar-SA')}</div>
+                      </div>
                     </div>
-                    {req.notes && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>ملاحظات: {req.notes}</div>}
+
+                    {/* Screenshot */}
                     {req.proof_url && (
-                      <div style={{ fontSize: '11px', marginBottom: '8px' }}>
-                        <a href={req.proof_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--info)' }}>📎 عرض إثبات التحويل</a>
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>لقطة الشاشة:</div>
+                        <a href={req.proof_url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={req.proof_url}
+                            alt="Screenshot"
+                            style={{ maxHeight: '200px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-primary)', cursor: 'pointer' }}
+                          />
+                        </a>
                       </div>
                     )}
+
+                    {req.notes && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px', padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)' }}>
+                        ملاحظات: {req.notes}
+                      </div>
+                    )}
+
+                    {/* Actions */}
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <button
                         className="btn btn-sm"
-                        style={{ background: 'var(--success)', color: '#fff', borderColor: 'var(--success)' }}
+                        style={{ background: 'var(--success)', color: '#fff', borderColor: 'var(--success)', flex: 1, padding: '10px' }}
                         onClick={() => handleAdminAction(req.request_id, 'approve')}
                       >
-                        ✅ تأكيد الشحن
+                        ✅ تأكيد وشحن الرصيد
                       </button>
                       <button
                         className="btn btn-danger btn-sm"
+                        style={{ flex: 1, padding: '10px' }}
                         onClick={() => handleAdminAction(req.request_id, 'reject')}
                       >
-                        ❌ رفض
+                        ❌ رفض الطلب
                       </button>
                     </div>
                   </div>
@@ -557,8 +723,9 @@ export default function WalletModule({ session }) {
                     <tr>
                       <th>#</th>
                       <th>المستخدم</th>
+                      <th>المرسِل</th>
+                      <th>رقم المعاملة</th>
                       <th>المبلغ</th>
-                      <th>الطريقة</th>
                       <th>التاريخ</th>
                       <th>الحالة</th>
                     </tr>
@@ -568,8 +735,9 @@ export default function WalletModule({ session }) {
                       <tr key={req.request_id}>
                         <td>{req.request_id}</td>
                         <td>#{req.user_id}</td>
+                        <td style={{ fontSize: '12px' }}>{req.sender_name || '—'}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>{req.bankily_txn_id || '—'}</td>
                         <td style={{ fontWeight: 700 }}>{formatCurrency(req.amount)}</td>
-                        <td>{req.payment_method}</td>
                         <td style={{ fontSize: '12px' }}>{new Date(req.created_at).toLocaleDateString('ar-SA')}</td>
                         <td>
                           <span style={{

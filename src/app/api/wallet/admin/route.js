@@ -3,7 +3,7 @@ import { getTable, updateRecord, insertRecord } from '@/lib/db';
 
 /**
  * GET /api/wallet/admin
- * Returns all pending top-up requests for FM review.
+ * Returns all top-up requests for FM review.
  */
 export async function GET() {
   try {
@@ -24,8 +24,6 @@ export async function GET() {
 /**
  * PUT /api/wallet/admin
  * Body: { request_id, action: 'approve' | 'reject', approved_by }
- * Approve: credits wallet balance + creates wallet_transaction
- * Reject: marks request as rejected
  */
 export async function PUT(request) {
   try {
@@ -52,7 +50,6 @@ export async function PUT(request) {
     }
 
     if (action === 'approve') {
-      // Credit the wallet
       const wallets = await getTable('wallets');
       const wallet = wallets.find(w => w.wallet_id === topup.wallet_id);
       if (!wallet) return NextResponse.json({ error: 'المحفظة غير موجودة' }, { status: 404 });
@@ -64,7 +61,6 @@ export async function PUT(request) {
         total_deposited: Number(wallet.total_deposited || 0) + Number(topup.amount),
       }, approved_by || 1);
 
-      // Create wallet transaction
       await insertRecord('wallet_transactions', {
         wallet_id: wallet.wallet_id,
         type: 'deposit',
@@ -72,11 +68,10 @@ export async function PUT(request) {
         balance_after: newBalance,
         reference_type: 'topup_request',
         reference_id: topup.request_id,
-        description: `شحن المحفظة - ${topup.payment_method} - ${topup.notes || ''}`,
+        description: `شحن المحفظة via بنكيلي — ${topup.sender_name || ''} — رقم المعاملة: ${topup.bankily_txn_id || 'N/A'}`,
         status: 'completed',
       }, approved_by || 1);
 
-      // Mark topup as approved
       await updateRecord('topup_requests', topup.request_id, {
         status: 'approved',
         approved_by: approved_by || null,

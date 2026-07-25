@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTable, insertRecord, query } from '@/lib/db';
+import { getTable, insertRecord } from '@/lib/db';
 
 /**
  * GET /api/wallet?userId=X
@@ -35,19 +35,19 @@ export async function GET(request) {
 
 /**
  * POST /api/wallet
- * Body: { action: 'topup' | 'withdraw', userId, amount, payment_method?, proof_url?, notes?, owner_id?, employee_id? }
+ * Body: { action: 'topup' | 'withdraw', userId, amount, sender_name?, screenshot_url?, bankily_txn_id?, notes?, owner_id?, employee_id? }
  */
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { action, userId, amount, payment_method, proof_url, notes, owner_id, employee_id } = body;
+    const { action, userId, amount, sender_name, screenshot_url, bankily_txn_id, notes, owner_id, employee_id } = body;
 
     if (!userId || !amount || Number(amount) <= 0) {
       return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 });
     }
 
     if (action === 'topup') {
-      return await handleTopup(Number(userId), Number(amount), payment_method, proof_url, notes, owner_id, employee_id);
+      return await handleTopup(Number(userId), Number(amount), sender_name, screenshot_url, bankily_txn_id, notes, owner_id, employee_id);
     }
 
     if (action === 'withdraw') {
@@ -61,15 +61,25 @@ export async function POST(request) {
   }
 }
 
-async function handleTopup(userId, amount, payment_method, proof_url, notes, owner_id, employee_id) {
+async function handleTopup(userId, amount, senderName, screenshotUrl, bankilyTxnId, notes, ownerId, employeeId) {
+  if (!senderName || !senderName.trim()) {
+    return NextResponse.json({ error: 'اسم صاحب الحساب المرسِل مطلوب' }, { status: 400 });
+  }
+  if (!bankilyTxnId || !/^\d{19}$/.test(bankilyTxnId)) {
+    return NextResponse.json({ error: 'يرجى إدخال الرقم التسلسلي المكون من 19 رقماً بشكل صحيح كما هو موضح في لقطة الشاشة' }, { status: 400 });
+  }
+  if (!screenshotUrl) {
+    return NextResponse.json({ error: 'يرجى رفع لقطة شاشة إشعار التحويل' }, { status: 400 });
+  }
+
   const wallets = await getTable('wallets');
   let wallet = wallets.find(w => w.user_id === userId);
 
   if (!wallet) {
     wallet = await insertRecord('wallets', {
       user_id: userId,
-      owner_id: owner_id || null,
-      employee_id: employee_id || null,
+      owner_id: ownerId || null,
+      employee_id: employeeId || null,
       balance: 0,
     });
   }
@@ -78,20 +88,22 @@ async function handleTopup(userId, amount, payment_method, proof_url, notes, own
     wallet_id: wallet.wallet_id,
     user_id: userId,
     amount,
-    payment_method: payment_method || 'بنكيلي',
-    proof_url: proof_url || null,
+    payment_method: 'بنكيلي',
+    proof_url: screenshotUrl,
+    sender_name: senderName.trim(),
+    bankily_txn_id: bankilyTxnId,
     notes: notes || null,
     status: 'pending',
   });
 
   return NextResponse.json({
     success: true,
-    message: `تم إرسال طلب شحن بمبلغ ${amount} MRU. في انتظار موافقة المحاسب.`,
+    message: `تم إرسال طلب شحن بمبلغ ${amount} MRU عبر بنكيلي. في انتظار موافقة المحاسب.`,
     topup_request: topupRequest,
   });
 }
 
-async function handleWithdraw(userId, amount, notes, owner_id, employee_id) {
+async function handleWithdraw(userId, amount, notes, ownerId, employeeId) {
   const wallets = await getTable('wallets');
   const wallet = wallets.find(w => w.user_id === userId);
 
@@ -103,7 +115,6 @@ async function handleWithdraw(userId, amount, notes, owner_id, employee_id) {
     return NextResponse.json({ error: `الرصيد غير كافٍ. المتاح: ${wallet.balance} MRU` }, { status: 400 });
   }
 
-  // Deduct from wallet immediately (pending FM review)
   const newBalance = Number(wallet.balance) - amount;
 
   const { updateRecord } = await import('@/lib/db');
