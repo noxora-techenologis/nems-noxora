@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAuthHeaders } from '@/lib/auth';
-import { ALL_POSITIONS } from '@/lib/positions';
+import { ALL_POSITIONS, POSITION_ROLE_MAP } from '@/lib/positions';
 
 import UserProfileModal from '@/components/UserProfileModal';
 
@@ -17,8 +17,7 @@ export default function UsersModule({ session }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [roleId, setRoleId] = useState(6); // default Employee
-  const [positionCode, setPositionCode] = useState('EMPLOYEE'); // default موظف عام
+  const [selectedOption, setSelectedOption] = useState('EMPLOYEE'); // position code or ROLE_<id>
 
   useEffect(() => {
     fetchData();
@@ -43,9 +42,38 @@ export default function UsersModule({ session }) {
     }
   };
 
+  // Build a combined list of ALL job positions + system roles not already covered
+  const roleIdByName = {};
+  (roles || []).forEach(r => {
+    roleIdByName[(r.role_name || '').toLowerCase()] = r.role_id;
+  });
+
+  const positionOptions = ALL_POSITIONS.map(p => {
+    const roleKey = POSITION_ROLE_MAP[p.code] || 'employee';
+    return {
+      value: p.code,
+      label: p.name,
+      roleId: roleIdByName[roleKey] || 6,
+    };
+  });
+
+  const systemRoleOptions = (roles || [])
+    .filter(r => !ALL_POSITIONS.some(p => (POSITION_ROLE_MAP[p.code] || 'employee').toLowerCase() === (r.role_name || '').toLowerCase()))
+    .map(r => ({
+      value: `ROLE_${r.role_id}`,
+      label: `${r.role_name} (نظام)`,
+      roleId: r.role_id,
+    }));
+
+  const allOptions = [...positionOptions, ...systemRoleOptions];
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!name || !email || !password) return;
+
+    const option = allOptions.find(o => o.value === selectedOption) || positionOptions.find(o => o.value === 'EMPLOYEE');
+    const roleId = option?.roleId || 6;
+    const jobTitle = option?.label || 'موظف';
 
     try {
       const res = await fetch('/api/data/users', {
@@ -66,7 +94,6 @@ export default function UsersModule({ session }) {
       const result = await res.json();
       if (result.success) {
         const newUser = result.data;
-        const position = ALL_POSITIONS.find(p => p.code === positionCode) || ALL_POSITIONS.find(p => p.code === 'EMPLOYEE');
         // Auto-create employee record with real name and email
         try {
           await fetch('/api/data/employees', {
@@ -76,7 +103,7 @@ export default function UsersModule({ session }) {
               user_id: newUser.user_id,
               name: name,
               email: email,
-              job_title: position?.name || 'موظف',
+              job_title: jobTitle.replace(' (نظام)', ''),
               department_id: 1,
               salary: 0,
               employment_status: 'active',
@@ -253,30 +280,18 @@ export default function UsersModule({ session }) {
                   <select
                     id="new-user-role"
                     className="form-select"
-                    value={roleId}
-                    onChange={e => setRoleId(e.target.value)}
+                    value={selectedOption}
+                    onChange={e => setSelectedOption(e.target.value)}
                   >
-                    {roles.map(r => (
-                      <option key={r.role_id} value={r.role_id}>
-                        {r.role_name} - {r.description}
+                    {allOptions.map(o => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">المسمى الوظيفي (المنصب)</label>
-                  <select
-                    id="new-user-position"
-                    className="form-select"
-                    value={positionCode}
-                    onChange={e => setPositionCode(e.target.value)}
-                  >
-                    {ALL_POSITIONS.map(p => (
-                      <option key={p.code} value={p.code}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                    يتم ربط المنصب تلقائياً بالصلاحيات والـ Dashboard المناسب
+                  </span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                   <button id="save-user-btn" type="submit" className="btn btn-primary" style={{ flex: 1 }}>حفظ وإنشاء الحساب</button>
@@ -287,7 +302,7 @@ export default function UsersModule({ session }) {
           ) : (
             <div className="card text-center" style={{ padding: '40px', color: 'var(--text-muted)' }}>
               <span>💡</span>
-              <p style={{ marginTop: '8px' }}>يتيح نظام NEMS تحكماً كاملاً للأدمن لإدارة الحسابات وربطها بالأقوار لضمان الأمان الأقصى للشركة</p>
+              <p style={{ marginTop: '8px' }}>يتيح نظام NEMS تحكماً كاملاً للأدمن لإدارة الحسابات وربطها بالأدوار لضمان الأمان الأقصى للشركة</p>
             </div>
           )}
         </div>

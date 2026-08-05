@@ -35,3 +35,38 @@ export const ALL_POSITIONS = [
   { code: 'EMPLOYEE', name: 'موظف عام', group: 'تشغيلية وخدمات مساندة' },
   { code: 'SHIPPING_AGENT', name: 'وكيل الشحن', group: 'تشغيلية وخدمات مساندة' },
 ];
+
+/**
+ * Map each job position code to the closest system role key
+ * (controls dashboard access / permissions).
+ * Falls back to 'employee' when no role applies.
+ */
+export const POSITION_ROLE_MAP = {
+  CEO: 'ceo',
+  COO: 'ceo',
+  CFO: 'fm',
+  CTO: 'employee',
+  CMO: 'employee',
+  CHRO: 'hr',
+  CPO: 'pm',
+  PM: 'pm',
+  FM: 'fm',
+  HR: 'hr',
+  MARKETING: 'employee',
+  SALES: 'employee',
+  OPS: 'employee',
+  LEGAL: 'employee',
+  IT: 'employee',
+  ACCOUNTANT: 'fm',
+  SUPERVISOR: 'employee',
+  ENGINEER: 'employee',
+  DESIGNER: 'employee',
+  ANALYST: 'employee',
+  CREATOR: 'employee',
+  RECEPTIONIST: 'employee',
+  SECURITY: 'employee',
+  DRIVER: 'employee',
+  EMPLOYEE: 'employee',
+  SHIPPING_AGENT: 'shipping_agent',
+};
+
