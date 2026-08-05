@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { prompt } = await request.json();
     if (!prompt) {
       return NextResponse.json({ reply: 'يرجى إدخال سؤال أو طلب.' });

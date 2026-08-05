@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function PMDashboard() {
   const router = useRouter();
@@ -11,9 +12,9 @@ export default function PMDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/data/projects').then(r => r.json()),
-      fetch('/api/data/tasks').then(r => r.json()),
-      fetch('/api/data/meetings').then(r => r.json()),
+      fetch('/api/data/projects', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/tasks', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/meetings', { headers: getAuthHeaders() }).then(r => r.json()),
     ]).then(([prjs, tsks, mts]) => {
       setData({ projects: prjs.data || [], tasks: tsks.data || [], meetings: mts.data || [] });
       setLoading(false);

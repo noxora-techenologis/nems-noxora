@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, deleteRecord, SAFE_TABLES } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 export async function GET(request, { params }) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { table } = await params;
 
     if (!SAFE_TABLES.has(table)) {
@@ -25,12 +29,16 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({ data: result, total: result.length });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Data GET Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 export async function POST(request, { params }) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { table } = await params;
 
     if (!SAFE_TABLES.has(table)) {
@@ -39,16 +47,20 @@ export async function POST(request, { params }) {
 
     const body = await request.json();
     const { _userId, ...record } = body;
-    const inserted = await insertRecord(table, record, _userId || 1);
+    const inserted = await insertRecord(table, record, user.user_id);
 
     return NextResponse.json({ success: true, data: inserted }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Data POST Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 export async function PUT(request, { params }) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { table } = await params;
 
     if (!SAFE_TABLES.has(table)) {
@@ -62,19 +74,23 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: '_id مطلوب للتحديث' }, { status: 400 });
     }
 
-    const updated = await updateRecord(table, _id, fields, _userId || 1);
+    const updated = await updateRecord(table, _id, fields, user.user_id);
     if (!updated) {
       return NextResponse.json({ error: 'السجل غير موجود' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Data PUT Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 export async function DELETE(request, { params }) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { table } = await params;
 
     if (!SAFE_TABLES.has(table)) {
@@ -83,14 +99,13 @@ export async function DELETE(request, { params }) {
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const userId = parseInt(searchParams.get('userId') || '1');
 
     if (!id) {
       return NextResponse.json({ error: 'id مطلوب للحذف' }, { status: 400 });
     }
 
     const idValue = isNaN(Number(id)) ? id : Number(id);
-    const deleted = await deleteRecord(table, idValue, userId);
+    const deleted = await deleteRecord(table, idValue, user.user_id);
 
     if (!deleted) {
       return NextResponse.json({ error: 'السجل غير موجود' }, { status: 404 });
@@ -98,6 +113,7 @@ export async function DELETE(request, { params }) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Data DELETE Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

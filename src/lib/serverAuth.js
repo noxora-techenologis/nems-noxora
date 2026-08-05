@@ -54,14 +54,21 @@ export async function verifySession(request) {
  * Verify the request user has one of the allowed roles.
  * Must be called AFTER verifySession.
  *
+ * Resolves the user's actual role from the `roles` table via role_id,
+ * since users.role_name is not reliably populated.
+ *
  * Usage:
  *   const { user, error } = await verifySession(request);
  *   if (error) return error;
- *   const roleError = requireRole(user, ['ceo', 'admin', 'fm']);
+ *   const roleError = await requireRole(user, ['ceo', 'admin', 'fm']);
  *   if (roleError) return roleError;
  */
-export function requireRole(user, allowedRoles) {
-  const userRole = (user.role_name || '').toLowerCase();
+export async function requireRole(user, allowedRoles) {
+  const roles = await getTable('roles');
+  const role = roles.find(r => r.role_id === user.role_id);
+
+  const userRoleRaw = user.role_name || role?.role_name || '';
+  const userRole = userRoleRaw.toLowerCase();
   const allowed = allowedRoles.map(r => r.toLowerCase());
 
   if (!allowed.includes(userRole)) {

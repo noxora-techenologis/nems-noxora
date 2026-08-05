@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatCurrency } from '@/lib/format';
-import { SESSION_KEY } from '@/lib/auth';
+import { SESSION_KEY, getAuthHeaders } from '@/lib/auth';
 
 export default function UserProfileModal({ user, currentUser, onClose, onUpdate }) {
   const isSelf = currentUser && (currentUser.user_id === user?.user_id || currentUser.user_id === user?.id);
@@ -59,7 +59,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       const targetUserId = user.user_id || user.id;
       const res = await fetch('/api/data/users', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           _id: targetUserId,
           _userId: currentUser?.user_id,
@@ -106,7 +106,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       const targetUserId = user.user_id || user.id;
       const res = await fetch('/api/auth/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           userId: targetUserId,
           currentPassword,

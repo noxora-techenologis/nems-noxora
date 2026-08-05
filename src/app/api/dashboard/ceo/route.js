@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
+    const roleErr = await requireRole(user, ['ceo', 'admin']);
+    if (roleErr) return roleErr;
+
     const [employees, projects, tasks, attendance, revenues, expenses, leaves, announcements, salaries] = await Promise.all([
       getTable('employees'),
       getTable('projects'),
@@ -66,6 +73,7 @@ export async function GET() {
       recentAnnouncements,
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Dashboard CEO Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

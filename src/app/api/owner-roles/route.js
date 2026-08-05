@@ -38,6 +38,9 @@ const ALL_POSITIONS = [
 // GET: List all positions + owner's current roles + pending requests
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const ownerId = searchParams.get('ownerId');
 
@@ -47,6 +50,16 @@ export async function GET(request) {
     ]);
 
     const owner = owners.find(o => o.owner_id === Number(ownerId));
+
+    // Only the owner themself (or privileged roles) can view their roles
+    const roles = await getTable('roles');
+    const role = roles.find(r => r.role_id === user.role_id);
+    const roleKey = (user.role_name || role?.role_name || '').toLowerCase();
+    const isPrivileged = ['admin', 'ceo', 'fm'].includes(roleKey);
+    if (owner && owner.user_id !== user.user_id && !isPrivileged) {
+      return NextResponse.json({ error: 'غير مصرح — لا يمكنك عرض مناصب مالك آخر' }, { status: 403 });
+    }
+
     const activeRoles = owner ? (owner.active_roles || ['OWNER']) : ['OWNER'];
     const pendingRequests = requests.filter(r =>
       r.owner_id === Number(ownerId) && r.status === 'pending'
@@ -58,13 +71,17 @@ export async function GET(request) {
       pending_requests: pendingRequests,
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Owner Roles GET Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
 // POST: Request a new position (Owner only)
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { owner_id, position_code, reason, user_id } = body;
 
@@ -82,6 +99,11 @@ export async function POST(request) {
     const owner = owners.find(o => o.owner_id === Number(owner_id));
     if (!owner) {
       return NextResponse.json({ error: 'المالك غير موجود' }, { status: 404 });
+    }
+
+    // Only the owner themself can request a position for themselves
+    if (owner.user_id !== user.user_id) {
+      return NextResponse.json({ error: 'غير مصرح — يمكنك طلب منصب لنفسك فقط' }, { status: 403 });
     }
 
     const activeRoles = owner.active_roles || ['OWNER'];
@@ -108,7 +130,8 @@ export async function POST(request) {
 
     return NextResponse.json({ success: true, data: result.rows[0] }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Owner Roles POST Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
 
@@ -175,7 +198,7 @@ export async function PUT(request) {
 
     // === APPROVAL — Server-side role check (CEO/Admin only) ===
     if (action === 'approve') {
-      const roleErr = requireRole(user, ['ceo', 'admin']);
+      const roleErr = await requireRole(user, ['ceo', 'admin']);
       if (roleErr) return roleErr;
 
       const requests = await getTable('position_requests');
@@ -226,7 +249,7 @@ export async function PUT(request) {
 
     // === REJECT — Server-side role check (CEO/Admin only) ===
     if (action === 'reject') {
-      const roleErr = requireRole(user, ['ceo', 'admin']);
+      const roleErr = await requireRole(user, ['ceo', 'admin']);
       if (roleErr) return roleErr;
 
       await query(

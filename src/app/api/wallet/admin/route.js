@@ -12,7 +12,7 @@ export async function GET(request) {
     const { user, error } = await verifySession(request);
     if (error) return error;
 
-    const roleErr = requireRole(user, ['shipping_agent', 'fm', 'ceo', 'admin']);
+    const roleErr = await requireRole(user, ['shipping_agent', 'fm', 'ceo', 'admin']);
     if (roleErr) return roleErr;
 
     const allTopups = await getTable('topup_requests');
@@ -38,7 +38,7 @@ export async function PUT(request) {
     const { user, error } = await verifySession(request);
     if (error) return error;
 
-    const roleErr = requireRole(user, ['shipping_agent', 'fm', 'ceo', 'admin']);
+    const roleErr = await requireRole(user, ['shipping_agent', 'fm', 'ceo', 'admin']);
     if (roleErr) return roleErr;
 
     const body = await request.json();

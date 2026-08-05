@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord } from '@/lib/db';
 import { calcWithdrawalFee, roundMRU } from '@/lib/fees';
-import { verifySession } from '@/lib/serverAuth';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
 /**
  * GET /api/wallet?userId=X
@@ -17,7 +17,8 @@ export async function GET(request) {
     if (!userId) return NextResponse.json({ error: 'userId مطلوب' }, { status: 400 });
 
     // Users can only access their own wallet (admins/fms can access any)
-    const isAdmin = ['admin', 'fm', 'ceo'].includes(user.role);
+    const roleError = await requireRole(user, ['admin', 'fm', 'ceo']);
+    const isAdmin = !roleError;
     if (!isAdmin && user.user_id !== Number(userId)) {
       return NextResponse.json({ error: 'غير مصرح — لا يمكنك عرض محفظة مستخدم آخر' }, { status: 403 });
     }
@@ -65,7 +66,8 @@ export async function POST(request) {
     if (!userId) return NextResponse.json({ error: 'userId مطلوب' }, { status: 400 });
 
     // Users can only perform actions on their own wallet
-    const isAdmin = ['admin', 'fm', 'ceo'].includes(user.role);
+    const roleError = await requireRole(user, ['admin', 'fm', 'ceo']);
+    const isAdmin = !roleError;
     if (!isAdmin && user.user_id !== Number(userId)) {
       return NextResponse.json({ error: 'غير مصرح — يمكنك التعامل مع محفظتك فقط' }, { status: 403 });
     }

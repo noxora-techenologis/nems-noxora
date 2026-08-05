@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { getSession, clearSession, getDashboardPath, hasAccess } from '@/lib/auth';
+import { getSession, clearSession, getDashboardPath, hasAccess, getAuthHeaders } from '@/lib/auth';
 import { getPreferredCurrency, setPreferredCurrency } from '@/lib/format';
 
 import UserProfileModal from '@/components/UserProfileModal';
@@ -73,7 +73,7 @@ export default function DashboardLayout({ children }) {
     setSession(sess);
 
     // Fetch user notifications
-    fetch(`/api/notifications?userId=${sess.user_id}`)
+    fetch(`/api/notifications?userId=${sess.user_id}`, { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         if (data.notifications) {
@@ -123,7 +123,7 @@ export default function DashboardLayout({ children }) {
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ prompt: textToSend, session }),
       });
       const data = await res.json();

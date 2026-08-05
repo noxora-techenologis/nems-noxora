@@ -13,7 +13,7 @@ export async function POST(request) {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
 
-    const roleErr = requireRole(user, ['ceo', 'admin', 'fm']);
+    const roleErr = await requireRole(user, ['ceo', 'admin', 'fm']);
     if (roleErr) return roleErr;
 
     const body = await request.json();

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import { verifySession } from '@/lib/serverAuth';
 
 /**
  * POST /api/upload
@@ -10,6 +11,9 @@ import path from 'path';
  */
 export async function POST(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const body = await request.json();
     const { file, filename } = body;
 

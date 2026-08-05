@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function HRDashboard() {
   const router = useRouter();
@@ -11,10 +12,10 @@ export default function HRDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/data/employees').then(r => r.json()),
-      fetch('/api/data/leaves').then(r => r.json()),
-      fetch('/api/data/attendance').then(r => r.json()),
-      fetch('/api/data/departments').then(r => r.json()),
+      fetch('/api/data/employees', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/leaves', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/attendance', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/departments', { headers: getAuthHeaders() }).then(r => r.json()),
     ]).then(([emps, leaves, att, depts]) => {
       const today = new Date().toISOString().split('T')[0];
       setData({

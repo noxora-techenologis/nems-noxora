@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport, formatDateArabic } from '@/lib/format';
-import { getSession } from '@/lib/auth';
+import { getSession, getAuthHeaders } from '@/lib/auth';
 import DashboardLayout from '@/components/DashboardLayout';
 
 const SLOT_LABELS = ['8ص', '9ص', '10ص', '11ص', '12م', '1م', '2م', '3م'];
@@ -24,7 +24,7 @@ export default function EmployeeDashboard() {
     const sess = getSession();
     setSession(sess);
     if (sess?.employee_id) {
-      fetch(`/api/dashboard/employee?employeeId=${sess.employee_id}`)
+      fetch(`/api/dashboard/employee?employeeId=${sess.employee_id}`, { headers: getAuthHeaders() })
         .then(r => r.json())
         .then(d => { setData(d); setLoading(false); })
         .catch(() => setLoading(false));
@@ -39,13 +39,13 @@ export default function EmployeeDashboard() {
     try {
       const res = await fetch('/api/attendance/checkin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ employee_id: session.employee_id, user_id: session.user_id }),
       });
       const result = await res.json();
       if (result.success) {
         // Reload data
-        const d = await fetch(`/api/dashboard/employee?employeeId=${session.employee_id}`).then(r => r.json());
+        const d = await fetch(`/api/dashboard/employee?employeeId=${session.employee_id}`, { headers: getAuthHeaders() }).then(r => r.json());
         setData(d);
       } else {
         alert(result.error || 'فشلت عملية التسجيل');

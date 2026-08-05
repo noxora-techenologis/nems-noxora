@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport, formatNumber } from '@/lib/format';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function OwnerDashboard() {
   const [data, setData] = useState(null);
@@ -17,12 +18,12 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/data/owners').then(r => r.json()),
-      fetch('/api/data/shares').then(r => r.json()),
-      fetch('/api/data/profit_distributions').then(r => r.json()),
-      fetch('/api/data/votes').then(r => r.json()),
-      fetch('/api/data/vote_options').then(r => r.json()),
-      fetch('/api/data/share_transactions').then(r => r.json()),
+      fetch('/api/data/owners', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/shares', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/profit_distributions', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/votes', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/vote_options', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/share_transactions', { headers: getAuthHeaders() }).then(r => r.json()),
     ]).then(([own, shr, dist, vts, vOpts, trans]) => {
       setData({
         owners: own.data || [],

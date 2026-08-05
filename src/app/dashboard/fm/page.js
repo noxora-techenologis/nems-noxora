@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function FMDashboard() {
   const router = useRouter();
@@ -19,11 +20,11 @@ export default function FMDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/data/revenues').then(r => r.json()),
-      fetch('/api/data/expenses').then(r => r.json()),
-      fetch('/api/data/salaries').then(r => r.json()),
-      fetch('/api/data/budgets').then(r => r.json()),
-      fetch('/api/data/deduction_proposals').then(r => r.json()),
+      fetch('/api/data/revenues', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/expenses', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/salaries', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/budgets', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/deduction_proposals', { headers: getAuthHeaders() }).then(r => r.json()),
     ]).then(([revs, exps, sals, bud, deds]) => {
       setData({
         revenues: revs.data || [],

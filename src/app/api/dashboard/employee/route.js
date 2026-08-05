@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
+import { verifySession } from '@/lib/serverAuth';
 
 const WORK_HOURS_PER_DAY = 8;
-const WORK_DAYS_PER_MONTH = 30;
+const WORK_DAYS_PER_MONTH = 22;
 
 export async function GET(request) {
   try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employeeId');
 
@@ -15,7 +19,20 @@ export async function GET(request) {
       return NextResponse.json({ error: 'employeeId required' }, { status: 400 });
     }
 
-    const [attendance, attendance_logs, tasks, leaves, salaries, deductions, notifications, announcements, employees] = await Promise.all([
+    const employees = await getTable('employees');
+    const emp = employees.find(e => e.employee_id === employeeIdNum);
+
+    // Users can only view their own dashboard (unless privileged)
+    if (emp && emp.user_id !== user.user_id) {
+      const roles = await getTable('roles');
+      const role = roles.find(r => r.role_id === user.role_id);
+      const roleKey = (user.role_name || role?.role_name || '').toLowerCase();
+      if (!['admin', 'hr', 'fm', 'ceo'].includes(roleKey)) {
+        return NextResponse.json({ error: 'غير مصرح — لا يمكنك عرض لوحة موظف آخر' }, { status: 403 });
+      }
+    }
+
+    const [attendance, attendance_logs, tasks, leaves, salaries, deductions, notifications, announcements, allEmployees] = await Promise.all([
       getTable('attendance'),
       getTable('attendance_logs'),
       getTable('tasks'),
@@ -30,7 +47,7 @@ export async function GET(request) {
     const today = new Date().toISOString().split('T')[0];
     const currentMonth = today.substring(0, 7);
 
-    const employee = employees.find(e => e.employee_id === employeeIdNum || String(e.employee_id) === String(employeeId));
+    const employee = allEmployees.find(e => e.employee_id === employeeIdNum || String(e.employee_id) === String(employeeId));
     const employeeUserId = employee?.user_id;
 
     // Today attendance
@@ -156,6 +173,7 @@ export async function GET(request) {
       announcements: announcements.filter(a => !a.expires_at || new Date(a.expires_at) > new Date()),
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Dashboard Employee Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

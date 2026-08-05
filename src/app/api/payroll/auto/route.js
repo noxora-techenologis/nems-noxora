@@ -13,7 +13,7 @@ export async function GET(request) {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
 
-    const roleErr = requireRole(user, ['fm', 'ceo', 'admin']);
+    const roleErr = await requireRole(user, ['fm', 'ceo', 'admin']);
     if (roleErr) return roleErr;
 
     const { searchParams } = new URL(request.url);
@@ -60,7 +60,7 @@ export async function POST(request) {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
 
-    const roleErr = requireRole(user, ['fm', 'admin']);
+    const roleErr = await requireRole(user, ['fm', 'admin']);
     if (roleErr) return roleErr;
 
     const body = await request.json();

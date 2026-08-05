@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { formatCurrency as fmtCur } from '@/lib/format';
+import { getAuthHeaders } from '@/lib/auth';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -12,13 +13,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/data/users').then(r => r.json()),
-      fetch('/api/data/roles').then(r => r.json()),
-      fetch('/api/data/audit_log').then(r => r.json()),
-      fetch('/api/data/system_settings').then(r => r.json()),
-      fetch('/api/data/company_valuation').then(r => r.json()),
-      fetch('/api/data/owners').then(r => r.json()),
-      fetch('/api/data/shares').then(r => r.json()),
+      fetch('/api/data/users', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/roles', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/audit_log', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/system_settings', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/company_valuation', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/owners', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/data/shares', { headers: getAuthHeaders() }).then(r => r.json()),
     ]).then(([usrs, rls, logs, sets, val, own, shr]) => {
       setData({
         users: usrs.data || [],

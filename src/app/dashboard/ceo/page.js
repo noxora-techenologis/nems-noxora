@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getAuthHeaders } from '@/lib/auth';
 
 const STATUS_LABELS = {
   active: { label: 'نشط', class: 'badge-success' },
@@ -32,7 +33,7 @@ export default function CEODashboard() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/dashboard/ceo')
+    fetch('/api/dashboard/ceo', { headers: getAuthHeaders() })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
