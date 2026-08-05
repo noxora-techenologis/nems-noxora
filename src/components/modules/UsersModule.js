@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAuthHeaders } from '@/lib/auth';
+import { ALL_POSITIONS } from '@/lib/positions';
 
 import UserProfileModal from '@/components/UserProfileModal';
 
@@ -17,6 +18,7 @@ export default function UsersModule({ session }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [roleId, setRoleId] = useState(6); // default Employee
+  const [positionCode, setPositionCode] = useState('EMPLOYEE'); // default موظف عام
 
   useEffect(() => {
     fetchData();
@@ -64,6 +66,7 @@ export default function UsersModule({ session }) {
       const result = await res.json();
       if (result.success) {
         const newUser = result.data;
+        const position = ALL_POSITIONS.find(p => p.code === positionCode) || ALL_POSITIONS.find(p => p.code === 'EMPLOYEE');
         // Auto-create employee record with real name and email
         try {
           await fetch('/api/data/employees', {
@@ -73,7 +76,7 @@ export default function UsersModule({ session }) {
               user_id: newUser.user_id,
               name: name,
               email: email,
-              job_title: 'موظف',
+              job_title: position?.name || 'موظف',
               department_id: 1,
               salary: 0,
               employment_status: 'active',
@@ -256,6 +259,21 @@ export default function UsersModule({ session }) {
                     {roles.map(r => (
                       <option key={r.role_id} value={r.role_id}>
                         {r.role_name} - {r.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">المسمى الوظيفي (المنصب)</label>
+                  <select
+                    id="new-user-position"
+                    className="form-select"
+                    value={positionCode}
+                    onChange={e => setPositionCode(e.target.value)}
+                  >
+                    {ALL_POSITIONS.map(p => (
+                      <option key={p.code} value={p.code}>
+                        {p.name}
                       </option>
                     ))}
                   </select>
