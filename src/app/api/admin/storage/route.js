@@ -14,13 +14,13 @@ export async function GET(request) {
     const roleErr = await requireRole(user, ['admin']);
     if (roleErr) return roleErr;
 
-    // Total database size + name
-    const dbSizeResult = await query(`SELECT pg_database_size(current_database()) AS size_bytes, current_database() AS db_name`);
-    const dbSizeBytes = Number(dbSizeResult.rows[0]?.size_bytes) || 0;
-    const dbName = dbSizeResult.rows[0]?.db_name || 'unknown';
+    // query() from db.js returns rows directly (not { rows })
+    const dbSizeRows = await query(`SELECT pg_database_size(current_database()) AS size_bytes, current_database() AS db_name`);
+    const dbSizeBytes = Number(dbSizeRows[0]?.size_bytes) || 0;
+    const dbName = dbSizeRows[0]?.db_name || 'unknown';
 
     // Table sizes and row counts (reltuples is an estimate, not exact)
-    const tablesResult = await query(`
+    const tableRows = await query(`
       SELECT
         t.tablename AS table_name,
         pg_total_relation_size(quote_ident(t.tablename)) AS total_bytes,
@@ -32,7 +32,7 @@ export async function GET(request) {
       ORDER BY total_bytes DESC
     `);
 
-    const tables = tablesResult.rows.map(r => ({
+    const tables = tableRows.map(r => ({
       table_name: r.table_name,
       total_bytes: Number(r.total_bytes) || 0,
       table_bytes: Number(r.table_bytes) || 0,
@@ -44,22 +44,22 @@ export async function GET(request) {
     const totalRows = tables.reduce((s, t) => s + t.row_count, 0);
 
     // Index count
-    const indexResult = await query(`
+    const indexRows = await query(`
       SELECT COUNT(*) AS index_count
       FROM pg_indexes
       WHERE schemaname = 'public'
     `);
-    const indexCount = Number(indexResult.rows[0]?.index_count) || 0;
+    const indexCount = Number(indexRows[0]?.index_count) || 0;
 
     // Active connections (may fail on restricted roles)
     let activeConnections = 0;
     try {
-      const connResult = await query(`
+      const connRows = await query(`
         SELECT COUNT(*) AS active_connections
         FROM pg_stat_activity
         WHERE datname = current_database() AND state = 'active'
       `);
-      activeConnections = Number(connResult.rows[0]?.active_connections) || 0;
+      activeConnections = Number(connRows[0]?.active_connections) || 0;
     } catch {
       // pg_stat_activity may not be accessible — ignore
     }
