@@ -20,6 +20,17 @@ const EXPECTED_MONTHLY_HOURS = WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY; // 176
 const MIN_SLOTS_FOR_DAY = 2;
 
 /**
+ * Normalize a DATE/TIMESTAMP value (JS Date object or string) into "YYYY-MM-DD".
+ * pg returns DATE columns as JS Date objects, so `.startsWith()`/`===` on the
+ * raw value would throw or always fail.
+ */
+export function attendanceDateKey(value) {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  return String(value).slice(0, 10);
+}
+
+/**
  * Calculate complete payroll for a single employee for a given month.
  *
  * @param {Object} employee - employee record from DB
@@ -65,9 +76,9 @@ export function calculateEmployeePayroll(employee, monthAttendance, monthTasks, 
   const completedTasks = monthTasks.filter(t => t.status === 'completed');
   const uncompletedTasks = monthTasks.filter(t => {
     if (t.status === 'completed') return false;
-    const deadline = t.deadline || '';
+    const deadline = attendanceDateKey(t.deadline);
     // Task is penalized if its deadline has passed and it's not completed
-    return deadline && deadline.substring(0, 7) <= month;
+    return deadline && deadline.slice(0, 7) <= month;
   });
   const delayedTasks = monthTasks.filter(t => t.is_delayed === true || t.is_delayed === 'true');
 
@@ -152,13 +163,13 @@ export function calculateMonthlyPayroll(allEmployees, allAttendance, allTasks, m
   const results = [];
   for (const emp of activeEmployees) {
     const empAttendance = allAttendance.filter(
-      a => a.employee_id === emp.employee_id && a.date?.startsWith(month)
+      a => a.employee_id === emp.employee_id && attendanceDateKey(a.date).startsWith(month)
     );
 
     const empTasks = allTasks.filter(t => {
       if (t.assigned_to !== emp.employee_id) return false;
-      const created = t.created_at?.substring(0, 7) || '';
-      const deadline = t.deadline || '';
+      const created = attendanceDateKey(t.created_at).slice(0, 7);
+      const deadline = attendanceDateKey(t.deadline);
       return created === month || deadline.startsWith(month);
     });
 

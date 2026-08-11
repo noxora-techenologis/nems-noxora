@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
+import { sameDay } from '@/lib/dates';
 
 export async function POST(request) {
   try {
@@ -34,7 +35,7 @@ export async function POST(request) {
     const netProfit = totalRevenue - totalExpenses - totalSalaries;
     const activeProjects = projects.filter(p => p.status === 'active').length;
     const totalEmployees = employees.length;
-    const todayPresent = attendance.filter(a => a.date === today && a.status === 'present').length;
+    const todayPresent = attendance.filter(a => sameDay(a.date, today) && a.status === 'present').length;
     const pendingLeaves = (await getTable('leaves')).filter(l => l.status === 'pending').length;
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
     const totalTasks = tasks.length;

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
 import { verifySession, requireRole } from '@/lib/serverAuth';
+import { sameDay } from '@/lib/dates';
 
 export async function GET(request) {
   try {
@@ -30,7 +31,7 @@ export async function GET(request) {
     const totalRevenue = revenues.filter(r => r.status === 'received').reduce((s, r) => s + r.amount, 0);
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
     const totalSalaries = salaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
-    const todayAttendance = attendance.filter(a => a.date === today && a.status === 'present').length;
+    const todayAttendance = attendance.filter(a => sameDay(a.date, today) && a.status === 'present').length;
     const pendingLeaves = leaves.filter(l => l.status === 'pending').length;
 
     // Projects health

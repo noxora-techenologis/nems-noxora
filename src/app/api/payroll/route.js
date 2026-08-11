@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
+import { sameMonth, dateKey } from '@/lib/dates';
 
 const WORK_HOURS_PER_DAY = 8;
 const WORK_DAYS_PER_MONTH = 22;
@@ -32,7 +33,7 @@ export async function GET(request) {
 
     for (const emp of targetEmployees) {
       const empAttendance = attendance.filter(a =>
-        a.employee_id === emp.employee_id && a.date?.startsWith(month)
+        a.employee_id === emp.employee_id && sameMonth(a.date, month)
       );
 
       const totalDaysWorked = empAttendance.length;
@@ -45,13 +46,13 @@ export async function GET(request) {
 
       const empTasks = tasks.filter(t => t.assigned_to === emp.employee_id);
       const monthTasks = empTasks.filter(t => {
-        const created = t.created_at?.substring(0, 7) || '';
-        const deadline = t.deadline || '';
-        return created === month || deadline.startsWith(month);
+        const created = sameMonth(t.created_at, month);
+        const deadline = sameMonth(t.deadline, month);
+        return created || deadline;
       });
 
       const completedTasks = monthTasks.filter(t => t.status === 'completed');
-      const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && (t.deadline || '').substring(0, 7) <= month);
+      const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && dateKey(t.deadline).slice(0, 7) <= month);
       const delayedTasks = monthTasks.filter(t => t.is_delayed === true || t.is_delayed === 'true');
 
       const taskDeductions = uncompletedTasks.reduce((sum, t) => sum + (Number(t.deduction_value) || 0), 0);

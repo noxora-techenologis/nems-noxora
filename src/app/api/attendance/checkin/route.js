@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query, auditLog } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
+import { sameDay } from '@/lib/dates';
 
 // Work hours: 08:00 - 17:00 = 8 hourly slots
 const WORK_START_HOUR = 8;
@@ -33,7 +34,7 @@ export async function POST(request) {
     const attendance = await getTable('attendance');
     const attendance_logs = await getTable('attendance_logs');
 
-    let todayRecord = attendance.find(a => a.employee_id === employee_id && a.date === today);
+    let todayRecord = attendance.find(a => a.employee_id === employee_id && sameDay(a.date, today));
 
     if (!todayRecord) {
       todayRecord = await insertRecord('attendance', {

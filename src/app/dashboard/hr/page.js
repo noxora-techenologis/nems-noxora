@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { getAuthHeaders } from '@/lib/auth';
+import { sameDay } from '@/lib/dates';
 
 export default function HRDashboard() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function HRDashboard() {
         leaves: leaves.data || [],
         attendance: att.data || [],
         departments: depts.data || [],
-        todayAtt: (att.data || []).filter(a => a.date === today),
+        todayAtt: (att.data || []).filter(a => sameDay(a.date, today)),
       });
       setLoading(false);
     }).catch(() => setLoading(false));

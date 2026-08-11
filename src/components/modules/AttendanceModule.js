@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport } from '@/lib/format';
 import { getAuthHeaders } from '@/lib/auth';
+import { sameDay, sameMonth, dateKey } from '@/lib/dates';
 
 const STATUS_LABELS = {
   present: { label: 'حاضر', class: 'badge-success' },
@@ -76,11 +77,11 @@ export default function AttendanceModule({ session }) {
     if (!emp) return null;
 
     const currentMonth = new Date().toISOString().substring(0, 7);
-    const monthAtt = attendance.filter(a => a.employee_id === session.employee_id && a.date?.startsWith(currentMonth));
+    const monthAtt = attendance.filter(a => a.employee_id === session.employee_id && sameMonth(a.date, currentMonth));
     const empTasks = tasks.filter(t => t.assigned_to === session.employee_id);
     const monthTasks = empTasks.filter(t => {
-      const created = t.created_at?.substring(0, 7) || '';
-      const deadline = t.deadline || '';
+      const created = dateKey(t.created_at).slice(0, 7);
+      const deadline = dateKey(t.deadline);
       return created === currentMonth || deadline.startsWith(currentMonth);
     });
 
@@ -90,7 +91,7 @@ export default function AttendanceModule({ session }) {
     const absentDays = monthAtt.filter(a => a.status === 'absent').length;
 
     const completedTasks = monthTasks.filter(t => t.status === 'completed');
-    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && (t.deadline || '').substring(0, 7) <= currentMonth);
+    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && dateKey(t.deadline).slice(0, 7) <= currentMonth);
 
     const salaryType = emp.salary_type || 'monthly';
     const hourlyRate = Number(emp.hourly_rate) || 0;
@@ -291,8 +292,8 @@ export default function AttendanceModule({ session }) {
 
   // Find employee's attendance record for today
   const today = new Date().toISOString().split('T')[0];
-  const todayRecord = attendance.find(a => a.employee_id === session.employee_id && a.date === today);
-  const confirmedSlotsCount = todayRecord ? displayAttendance.filter(a => a.date === today).length : 0; // Wait, actually daily record has a separate logs counter. Let's keep it simple.
+  const todayRecord = attendance.find(a => a.employee_id === session.employee_id && sameDay(a.date, today));
+  const confirmedSlotsCount = todayRecord ? displayAttendance.filter(a => sameDay(a.date, today)).length : 0;
 
   return (
     <div>
@@ -304,8 +305,8 @@ export default function AttendanceModule({ session }) {
         {isEmployee && (() => {
           // Build today's slots from attendanceLogs
           const today = new Date().toISOString().split('T')[0];
-          const todayRecord = attendance.find(a => a.employee_id === session.employee_id && a.date === today);
-          const todayLogs = attendanceLogs.filter(l => l.employee_id === session.employee_id && (l.timestamp || '').startsWith(today));
+          const todayRecord = attendance.find(a => a.employee_id === session.employee_id && sameDay(a.date, today));
+          const todayLogs = attendanceLogs.filter(l => l.employee_id === session.employee_id && sameDay(l.timestamp, today));
           const SHIFT_HOURS = [8, 9, 10, 11, 12, 13, 14, 15]; // 8 working-hour slots
 
           return (
@@ -316,7 +317,7 @@ export default function AttendanceModule({ session }) {
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '2px' }}>حضور اليوم</div>
                   <div style={{ fontWeight: 800, fontSize: '13px', color: todayRecord ? 'var(--success)' : 'var(--text-secondary)' }}>
-                    {todayRecord ? `دخول: ${todayRecord.check_in?.split(' ')[1] || '--:--'}` : 'لم يُسجَّل بعد'}
+                    {todayRecord ? `دخول: ${todayRecord.check_in ? String(todayRecord.check_in).split(' ').pop().slice(0, 5) : '--:--'}` : 'لم يُسجَّل بعد'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
+import { sameDay, sameMonth } from '@/lib/dates';
 
 const WORK_HOURS_PER_DAY = 8;
 const WORK_DAYS_PER_MONTH = 22;
@@ -51,7 +52,7 @@ export async function GET(request) {
     const employeeUserId = employee?.user_id;
 
     // Today attendance
-    const todayAttendance = attendance.find(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && a.date === today);
+    const todayAttendance = attendance.find(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && sameDay(a.date, today));
 
     // Today hourly logs
     const todayLogs = todayAttendance
@@ -71,7 +72,7 @@ export async function GET(request) {
     });
 
     // This month attendance summary
-    const monthAttendance = attendance.filter(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && a.date?.startsWith(currentMonth));
+    const monthAttendance = attendance.filter(a => (a.employee_id === employeeIdNum || String(a.employee_id) === String(employeeId)) && sameMonth(a.date, currentMonth));
 
     const monthTotalHours = monthAttendance.reduce((s, a) => s + (Number(a.total_hours) || 0), 0);
     const monthAbsentHours = monthAttendance.reduce((s, a) => s + (Number(a.absent_hours) || 0), 0);
@@ -79,13 +80,13 @@ export async function GET(request) {
     // Tasks - categorize for productivity
     const myTasks = tasks.filter(t => t.assigned_to === employeeIdNum || String(t.assigned_to) === String(employeeId));
     const monthTasks = myTasks.filter(t => {
-      const created = t.created_at?.substring(0, 7) || '';
-      const deadline = t.deadline || '';
-      return created === currentMonth || deadline.startsWith(currentMonth);
+      const created = sameMonth(t.created_at, currentMonth);
+      const deadline = sameMonth(t.deadline, currentMonth);
+      return created || deadline;
     });
 
     const completedTasks = monthTasks.filter(t => t.status === 'completed');
-    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && (t.deadline || '').substring(0, 7) <= currentMonth);
+    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && dateKey(t.deadline).slice(0, 7) <= currentMonth);
     const delayedTasks = monthTasks.filter(t => t.is_delayed === true || t.is_delayed === 'true');
 
     const taskStats = {

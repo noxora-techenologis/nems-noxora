@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, updateRecord, auditLog } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
+import { sameDay } from '@/lib/dates';
 
 const MAX_SLOTS = 8;
 const MIN_SLOTS_REQUIRED = 2;
@@ -21,7 +22,7 @@ export async function POST(request) {
     const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
 
     const attendance = await getTable('attendance');
-    const todayRecord = attendance.find(a => a.employee_id === employee_id && a.date === today);
+    const todayRecord = attendance.find(a => a.employee_id === employee_id && sameDay(a.date, today));
 
     if (!todayRecord) {
       return NextResponse.json({ error: 'لا يوجد سجل حضور لهذا اليوم. يجب تسجيل الدخول أولاً.' }, { status: 404 });

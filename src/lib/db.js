@@ -107,6 +107,21 @@ function serializeValues(obj) {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, serializeValue(v)]));
 }
 
+// ─── Column existence cache ───
+const tableColumnsCache = new Map();
+
+async function hasColumn(table, column) {
+  if (!usePostgres) return true;
+  if (!tableColumnsCache.has(table)) {
+    const res = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+      [table]
+    );
+    tableColumnsCache.set(table, new Set(res.rows.map(r => r.column_name)));
+  }
+  return tableColumnsCache.get(table).has(column);
+}
+
 // ─── Core Query ───
 export async function query(text, params = []) {
   if (!usePostgres) throw new Error('DATABASE_URL not configured');
@@ -127,7 +142,9 @@ export async function insertRecord(table, record, userId = 1) {
   validate(table);
   if (!usePostgres) throw new Error('DATABASE_URL not configured');
 
-  record.created_at = now();
+  if (await hasColumn(table, 'created_at')) {
+    record.created_at = now();
+  }
   const safe = serializeValues(record);
   const keys = Object.keys(safe);
   const values = Object.values(safe);
@@ -151,7 +168,9 @@ export async function updateRecord(table, idValue, updatedFields, userId = 1) {
   if (!usePostgres) throw new Error('DATABASE_URL not configured');
 
   const idKey = pk(table);
-  updatedFields.updated_at = now();
+  if (await hasColumn(table, 'updated_at')) {
+    updatedFields.updated_at = now();
+  }
 
   const safe = serializeValues(updatedFields);
   const keys = Object.keys(safe);
