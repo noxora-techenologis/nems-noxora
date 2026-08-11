@@ -67,6 +67,8 @@ export default function UsersModule({ session }) {
 
   const allOptions = [...positionOptions, ...systemRoleOptions];
 
+  const OWNER_ROLE_ID = 7;
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     if (!name || !email || !password) return;
@@ -74,6 +76,7 @@ export default function UsersModule({ session }) {
     const option = allOptions.find(o => o.value === selectedOption) || positionOptions.find(o => o.value === 'EMPLOYEE');
     const roleId = option?.roleId || 6;
     const jobTitle = option?.label || 'موظف';
+    const isOwnerRole = Number(roleId) === OWNER_ROLE_ID;
 
     try {
       const res = await fetch('/api/data/users', {
@@ -94,24 +97,65 @@ export default function UsersModule({ session }) {
       const result = await res.json();
       if (result.success) {
         const newUser = result.data;
-        // Auto-create employee record with real name and email
-        try {
-          await fetch('/api/data/employees', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-            body: JSON.stringify({
-              user_id: newUser.user_id,
-              name: name,
-              email: email,
-              job_title: jobTitle.replace(' (نظام)', ''),
-              department_id: 1,
-              salary: 0,
-              employment_status: 'active',
-              _userId: session.user_id,
-            }),
-          });
-        } catch { /* ignore employee creation errors */ }
-        alert('تم إنشاء حساب المستخدم وإضافته كموظف تلقائياً!');
+
+        if (isOwnerRole) {
+          // Create owner record
+          try {
+            const ownerRes = await fetch('/api/data/owners', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+              body: JSON.stringify({
+                user_id: newUser.user_id,
+                name: name,
+                email: email,
+                total_shares: 0,
+                share_percentage: 0,
+                join_date: new Date().toISOString().split('T')[0],
+                status: 'active',
+                active_roles: JSON.stringify(['OWNER']),
+                _userId: session.user_id,
+              }),
+            });
+            const ownerResult = await ownerRes.json();
+
+            // Create shares record for the new owner
+            if (ownerResult.success && ownerResult.data?.owner_id) {
+              await fetch('/api/data/shares', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                body: JSON.stringify({
+                  owner_id: ownerResult.data.owner_id,
+                  total_shares: 0,
+                  ownership_percentage: 0,
+                  class: 'common',
+                  status: 'active',
+                  _userId: session.user_id,
+                }),
+              });
+            }
+          } catch { /* ignore owner creation errors */ }
+          alert('تم إنشاء حساب المالك بنجاح! يمكنه الآن تسجيل الدخول والدخول إلى لوحة الملاك.');
+        } else {
+          // Auto-create employee record for non-owner roles
+          try {
+            await fetch('/api/data/employees', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+              body: JSON.stringify({
+                user_id: newUser.user_id,
+                name: name,
+                email: email,
+                job_title: jobTitle.replace(' (نظام)', ''),
+                department_id: 1,
+                salary: 0,
+                employment_status: 'active',
+                _userId: session.user_id,
+              }),
+            });
+          } catch { /* ignore employee creation errors */ }
+          alert('تم إنشاء حساب المستخدم وإضافته كموظف تلقائياً!');
+        }
+
         setName('');
         setEmail('');
         setPassword('');

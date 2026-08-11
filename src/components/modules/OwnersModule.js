@@ -536,6 +536,34 @@ export default function OwnersModule({ session }) {
     );
   }
 
+  // If user has owner role but no owner record, show clear message
+  if (isOwner && !session.owner_id) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', maxWidth: '500px', margin: '0 auto' }}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>🏛️</div>
+        <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '12px' }}>
+          حسابك غير مسجل كمالك
+        </h2>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.8, marginBottom: '24px' }}>
+          دورك في النظام هو <strong>مالك (Owner)</strong> لكن لا يوجد سجل ملكية مرتبط بحسابك.
+          <br />
+          يرجى التواصل مع مدير النظام لتسجيل حسابك كمالك في النظام.
+        </p>
+        <div style={{
+          padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-accent)', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'right'
+        }}>
+          <strong>ماذا تحتاج؟</strong>
+          <ul style={{ marginTop: '8px', paddingRight: '16px', listStyle: 'disc' }}>
+            <li>تسجيل سجل مالك (owner) مرتبط بحسابك</li>
+            <li>تخصيص أسهم لك في جدول shares</li>
+            <li>تحديث الجلسة (تسجيل الخروج ثم الدخول مرة أخرى)</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
