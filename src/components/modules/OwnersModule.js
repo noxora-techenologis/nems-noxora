@@ -53,12 +53,6 @@ export default function OwnersModule({ session }) {
   const [withdrawNotes, setWithdrawNotes] = useState('');
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
 
-  // Valuation edit form
-  const [editAssets, setEditAssets] = useState('');
-  const [editLiabilities, setEditLiabilities] = useState('');
-  const [editNotes, setEditNotes] = useState('');
-  const [showValuationForm, setShowValuationForm] = useState(false);
-
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
   const isFM = session.role_name.toLowerCase() === 'fm';
@@ -436,40 +430,6 @@ export default function OwnersModule({ session }) {
         fetchData();
       } else {
         alert(result.error || 'فشل تقديم الطلب');
-      }
-    } catch {
-      alert('تعذر الاتصال بالخادم');
-    }
-  };
-
-  const handleUpdateValuation = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/api/data/company_valuation', {
-        method: valuation ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify(valuation ? {
-          _id: valuation.valuation_id,
-          _userId: session.user_id,
-          total_assets: Number(editAssets) || 0,
-          total_liabilities: Number(editLiabilities) || 0,
-          notes: editNotes,
-          updated_by: session.user_id,
-        } : {
-          total_assets: Number(editAssets) || 0,
-          total_liabilities: Number(editLiabilities) || 0,
-          notes: editNotes,
-          updated_by: session.user_id,
-          _userId: session.user_id,
-        })
-      });
-      const result = await res.json();
-      if (result.success) {
-        alert('تم تحديث تقييم أصول الشركة بنجاح!');
-        setShowValuationForm(false);
-        fetchData();
-      } else {
-        alert(result.error || 'فشلت العملية');
       }
     } catch {
       alert('تعذر الاتصال بالخادم');
