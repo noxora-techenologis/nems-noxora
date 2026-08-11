@@ -2,22 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { getAuthHeaders } from '@/lib/auth';
+import { formatNumber } from '@/lib/format';
 
 function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
+  if (!bytes || bytes <= 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatNumber(n) {
-  return Number(n || 0).toLocaleString('ar-SA');
-}
+const DB_SIZE_LIMIT_MB = 512;
 
 export default function StorageModule() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState('total_bytes');
 
   useEffect(() => {
@@ -26,17 +26,18 @@ export default function StorageModule() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/admin/storage', { headers: getAuthHeaders() });
       const result = await res.json();
       if (result.error) {
-        alert(result.error);
+        setError(result.error);
       } else {
         setData(result);
       }
     } catch (err) {
       console.error(err);
-      alert('تعذر جلب بيانات التخزين');
+      setError('تعذر الاتصال بالخادم');
     } finally {
       setLoading(false);
     }
@@ -46,6 +47,17 @@ export default function StorageModule() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh' }}>
         <div className="animate-spin" style={{ fontSize: '32px' }}>⟳</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+        <h2 style={{ color: 'var(--danger)', marginBottom: '8px' }}>خطأ في تحميل البيانات</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>{error}</p>
+        <button className="btn btn-primary" onClick={fetchData}>🔄 إعادة المحاولة</button>
       </div>
     );
   }
@@ -64,7 +76,7 @@ export default function StorageModule() {
     return a.table_name.localeCompare(b.table_name);
   });
 
-  const dbUsagePercent = database.total_size_mb > 0 ? Math.min(100, (database.total_size_mb / 512) * 100) : 0;
+  const dbUsagePercent = database.total_size_mb > 0 ? Math.min(100, (database.total_size_mb / DB_SIZE_LIMIT_MB) * 100) : 0;
 
   return (
     <div>
@@ -87,7 +99,7 @@ export default function StorageModule() {
             <div style={{ height: '100%', width: `${dbUsagePercent}%`, borderRadius: '3px', background: dbUsagePercent > 80 ? 'var(--danger)' : 'var(--info)' }} />
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {dbUsagePercent.toFixed(1)}% من 512 MB
+            {dbUsagePercent.toFixed(1)}% من {DB_SIZE_LIMIT_MB} MB
           </div>
         </div>
 
@@ -99,7 +111,7 @@ export default function StorageModule() {
         </div>
 
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الصفوف</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي الصفوف (تقريبي)</div>
           <div style={{ fontSize: '28px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
             {formatNumber(database.total_rows)}
           </div>
