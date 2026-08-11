@@ -23,6 +23,7 @@ import DebtsModule from '@/components/modules/DebtsModule';
 import PayrollModule from '@/components/modules/PayrollModule';
 import WalletModule from '@/components/modules/WalletModule';
 import WalletAdminModule from '@/components/modules/WalletAdminModule';
+import StorageModule from '@/components/modules/StorageModule';
 
 export default function DynamicModulePage() {
   const params = useParams();
@@ -122,6 +123,8 @@ export default function DynamicModulePage() {
         return <WalletModule session={session} />;
       case 'wallet_admin':
         return <WalletAdminModule session={session} />;
+      case 'storage':
+        return <StorageModule session={session} />;
       default:
         return (
           <div className="card text-center" style={{ padding: '40px' }}>

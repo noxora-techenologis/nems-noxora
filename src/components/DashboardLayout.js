@@ -28,6 +28,7 @@ const NAV_ITEMS = {
   payroll:    { icon: '💰', label: 'الرواتب', path: '/payroll' },
   wallet:     { icon: '🏦', label: 'المحفظة', path: '/wallet' },
   wallet_admin: { icon: '🔧', label: 'إدارة الشحن', path: '/wallet_admin' },
+  storage: { icon: '🗄️', label: 'مساحة التخزين', path: '/storage' },
 };
 
 const ROLE_COLORS = {

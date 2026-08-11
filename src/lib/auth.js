@@ -49,7 +49,7 @@ export function requireAuth(router) {
 
 // Role-based access control
 export const ROLE_MODULES = {
-  admin:    ['dashboard', 'users', 'settings', 'logs', 'owners', 'payroll', 'wallet'],
+  admin:    ['dashboard', 'users', 'settings', 'logs', 'owners', 'payroll', 'wallet', 'storage'],
   ceo:      ['dashboard', 'employees', 'attendance', 'projects', 'clients', 'finance', 'owners', 'meetings', 'documents', 'messages', 'reports', 'settings', 'debts', 'payroll', 'wallet'],
   fm:       ['dashboard', 'finance', 'clients', 'employees', 'reports', 'meetings', 'debts', 'payroll', 'wallet', 'wallet_admin'],
   hr:       ['dashboard', 'employees', 'attendance', 'meetings', 'reports', 'wallet'],
