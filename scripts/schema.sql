@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS attendance (
   confirmed_slots INT DEFAULT 0,
   notes TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP
+  updated_at TIMESTAMP,
+  CONSTRAINT uq_attendance_employee_date UNIQUE (employee_id, date)
 );
 
 CREATE TABLE IF NOT EXISTS attendance_logs (
@@ -140,7 +141,8 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
   device VARCHAR(200),
   location VARCHAR(200),
   timestamp TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP
+  updated_at TIMESTAMP,
+  CONSTRAINT uq_attendance_logs_att_slot UNIQUE (attendance_id, hour_slot)
 );
 
 CREATE TABLE IF NOT EXISTS leaves (

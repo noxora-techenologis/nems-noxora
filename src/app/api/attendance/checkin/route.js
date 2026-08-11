@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getTable, insertRecord, updateRecord, query, auditLog } from '@/lib/db';
+import { getTable, query, updateRecord, auditLog } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
-import { sameDay } from '@/lib/dates';
 
-// Work hours: 08:00 - 17:00 = 8 hourly slots
+// Work hours: 08:00 - 16:00 = 8 hourly slots
 const WORK_START_HOUR = 8;
 const MAX_SLOTS = 8;
-const SLOT_DURATION_MS = 60 * 60 * 1000; // 1 hour
 
 function getCurrentSlot(now) {
   const hour = now.getHours();
@@ -21,78 +19,92 @@ export async function POST(request) {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
 
-    const { employee_id, user_id } = await request.json();
-
-    if (!employee_id) {
-      return NextResponse.json({ error: 'employee_id مطلوب' }, { status: 400 });
+    // SECURITY: employee is resolved from the authenticated session user —
+    // never from the request body (prevents checking in on behalf of others).
+    const employees = await getTable('employees');
+    const emp = employees.find(e => e.user_id === user.user_id);
+    if (!emp) {
+      return NextResponse.json({ error: 'لا يوجد موظف مرتبط بحسابك.' }, { status: 403 });
     }
+    const employee_id = emp.employee_id;
+    const userId = user.user_id;
 
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
 
-    const attendance = await getTable('attendance');
-    const attendance_logs = await getTable('attendance_logs');
+    // Race-safe: ensure today's attendance row exists (unique employee_id + date).
+    // ON CONFLICT DO NOTHING means concurrent first-check-ins collapse to one row.
+    const attInsert = await query(
+      `INSERT INTO "attendance" ("employee_id","date","check_in","check_out","total_hours","overtime_hours","absent_hours","confirmed_slots","status","notes","created_at")
+       VALUES ($1,$2,$3,NULL,0,0,0,0,'present',$4,$5)
+       ON CONFLICT ("employee_id","date") DO NOTHING
+       RETURNING *`,
+      [employee_id, today, nowStr, 'تسجيل حضور بواسطة النظام', nowStr]
+    );
 
-    let todayRecord = attendance.find(a => a.employee_id === employee_id && sameDay(a.date, today));
-
-    if (!todayRecord) {
-      todayRecord = await insertRecord('attendance', {
-        employee_id,
-        date: today,
-        check_in: nowStr,
-        check_out: null,
-        total_hours: 0,
-        overtime_hours: 0,
-        absent_hours: 0,
-        confirmed_slots: 0,
-        status: 'present',
-        notes: 'تسجيل حضور بواسطة النظام',
-      }, user_id || 1);
+    let todayRecord;
+    if (attInsert.length > 0) {
+      todayRecord = attInsert[0];
+      auditLog(userId, 'create', 'Attendance', 'attendance', todayRecord.attendance_id, null, todayRecord).catch(() => {});
+    } else {
+      const existing = await query(
+        `SELECT * FROM "attendance" WHERE "employee_id" = $1 AND "date" = $2`,
+        [employee_id, today]
+      );
+      todayRecord = existing[0];
     }
 
-    const todayLogs = attendance_logs.filter(l => l.attendance_id === todayRecord.attendance_id);
+    const logCountRes = await query(
+      `SELECT COUNT(*) AS c FROM "attendance_logs" WHERE "attendance_id" = $1`,
+      [todayRecord.attendance_id]
+    );
+    const existingLogCount = Number(logCountRes[0].c);
 
-    if (todayLogs.length >= MAX_SLOTS) {
+    if (existingLogCount >= MAX_SLOTS) {
       return NextResponse.json({ error: 'تم تسجيل جميع البصمات اليومية الثماني بنجاح.' }, { status: 409 });
     }
 
     const currentSlot = getCurrentSlot(now);
 
     if (currentSlot <= 0 || currentSlot > MAX_SLOTS) {
-      return NextResponse.json({ error: 'خارج ساعات الدوام الرسمية (08:00 - 17:00)' }, { status: 400 });
+      return NextResponse.json({ error: 'خارج ساعات الدوام الرسمية (08:00 - 16:00)' }, { status: 400 });
     }
 
-    const alreadyConfirmed = todayLogs.find(l => l.hour_slot === currentSlot);
-    if (alreadyConfirmed) {
+    // Race-safe: unique (attendance_id, hour_slot) — a concurrent request for the
+    // same slot returns no row, which we treat as "already confirmed".
+    const logResult = await query(
+      `INSERT INTO "attendance_logs" ("employee_id","attendance_id","timestamp","hour_slot","status","device","location","updated_at")
+       VALUES ($1,$2,$3,$4,'confirmed',$5,$6,$7)
+       ON CONFLICT ("attendance_id","hour_slot") DO NOTHING
+       RETURNING *`,
+      [employee_id, todayRecord.attendance_id, nowStr, currentSlot, '💻 Web App', 'المكتب الرئيسي', nowStr]
+    );
+
+    if (logResult.length === 0) {
       return NextResponse.json({ error: `البصمة ${currentSlot} تم تسجيلها بالفعل.` }, { status: 409 });
     }
 
-    const logRecord = await insertRecord('attendance_logs', {
-      employee_id,
-      attendance_id: todayRecord.attendance_id,
-      timestamp: nowStr,
-      hour_slot: currentSlot,
-      status: 'confirmed',
-      device: '💻 Web App',
-      location: 'المكتب الرئيسي',
-    }, user_id || 1);
+    auditLog(userId, 'checkin', 'Attendance', 'attendance_logs', logResult[0].log_id, null, logResult[0]).catch(() => {});
 
-    const updatedLogsCount = todayLogs.length + 1;
+    const updatedLogsCount = existingLogCount + 1;
     const totalHours = updatedLogsCount;
-
     const absentHours = Math.max(0, MAX_SLOTS - updatedLogsCount);
-    const isLate = todayLogs.length === 0 && now.getHours() > WORK_START_HOUR + 1;
 
-    await updateRecord('attendance', todayRecord.attendance_id, {
+    const updates = {
       total_hours: totalHours,
       confirmed_slots: updatedLogsCount,
       absent_hours: absentHours,
-      overtime_hours: Math.max(0, totalHours - MAX_SLOTS),
-      is_late: isLate,
-      status: totalHours >= MAX_SLOTS ? 'present' : 'present',
-      updated_at: nowStr,
-    }, user_id || 1);
+      overtime_hours: 0,
+      status: 'present',
+    };
+    // is_late is decided by the FIRST check-in of the day only; later check-ins
+    // must NOT overwrite it.
+    if (existingLogCount === 0) {
+      updates.is_late = now.getHours() > WORK_START_HOUR + 1;
+    }
+
+    await updateRecord('attendance', todayRecord.attendance_id, updates, userId);
 
     return NextResponse.json({
       success: true,

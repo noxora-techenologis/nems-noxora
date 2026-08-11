@@ -91,7 +91,11 @@ export default function AttendanceModule({ session }) {
     const absentDays = monthAtt.filter(a => a.status === 'absent').length;
 
     const completedTasks = monthTasks.filter(t => t.status === 'completed');
-    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && dateKey(t.deadline).slice(0, 7) <= currentMonth);
+    const uncompletedTasks = monthTasks.filter(t => {
+      if (t.status === 'completed') return false;
+      const deadline = dateKey(t.deadline);
+      return deadline && deadline.slice(0, 7) <= currentMonth;
+    });
 
     const salaryType = emp.salary_type || 'monthly';
     const hourlyRate = Number(emp.hourly_rate) || 0;
@@ -105,8 +109,10 @@ export default function AttendanceModule({ session }) {
       grossSalary = basicSalary;
     }
 
+    // Hourly employees are already paid only for worked hours, so absent
+    // hours are not deducted again — same rule as the server payroll engine.
     const hourlyRateForAbsence = salaryType === 'hourly'
-      ? hourlyRate
+      ? 0
       : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
 
     const attendanceDeductions = absentHours * hourlyRateForAbsence;
@@ -293,7 +299,6 @@ export default function AttendanceModule({ session }) {
   // Find employee's attendance record for today
   const today = new Date().toISOString().split('T')[0];
   const todayRecord = attendance.find(a => a.employee_id === session.employee_id && sameDay(a.date, today));
-  const confirmedSlotsCount = todayRecord ? displayAttendance.filter(a => sameDay(a.date, today)).length : 0;
 
   return (
     <div>
@@ -510,10 +515,12 @@ export default function AttendanceModule({ session }) {
                   const dayHours = Number(row.total_hours) || 0;
                   const dayAbsentHours = Number(row.absent_hours) || 0;
                   const dayGross = salaryType === 'hourly' ? dayHours * hourlyRate : basicSalary / WORK_DAYS_PER_MONTH;
-                  const hourlyRateForAbsence = salaryType === 'hourly' ? hourlyRate : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
+                  // Hourly employees are paid only for worked hours — no
+                  // separate absence deduction (matches payroll engine).
+                  const hourlyRateForAbsence = salaryType === 'hourly' ? 0 : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
                   const dayAttDeduction = dayAbsentHours * hourlyRateForAbsence;
 
-                  const dayTasks = tasks.filter(t => t.assigned_to === row.employee_id && t.deadline === row.date);
+                  const dayTasks = tasks.filter(t => t.assigned_to === row.employee_id && sameDay(t.deadline, row.date));
                   const completedDayTasks = dayTasks.filter(t => t.status === 'completed').length;
                   const uncompletedDayTasks = dayTasks.filter(t => t.status !== 'completed').length;
                   const dayTaskDeductions = dayTasks.filter(t => t.status !== 'completed').reduce((s, t) => s + (Number(t.deduction_value) || 0), 0);

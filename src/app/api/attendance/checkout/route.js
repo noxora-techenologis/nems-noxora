@@ -11,11 +11,14 @@ export async function POST(request) {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
 
-    const { employee_id, user_id } = await request.json();
-
-    if (!employee_id) {
-      return NextResponse.json({ error: 'employee_id مطلوب' }, { status: 400 });
+    // SECURITY: employee is resolved from the authenticated session user.
+    const employees = await getTable('employees');
+    const emp = employees.find(e => e.user_id === user.user_id);
+    if (!emp) {
+      return NextResponse.json({ error: 'لا يوجد موظف مرتبط بحسابك.' }, { status: 403 });
     }
+    const employee_id = emp.employee_id;
+    const userId = user.user_id;
 
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
@@ -33,8 +36,12 @@ export async function POST(request) {
     }
 
     const attendance_logs = await getTable('attendance_logs');
-    const todayLogs = attendance_logs.filter(l => l.attendance_id === todayRecord.attendance_id);
-    const confirmedSlots = todayLogs.length;
+    // Only count CONFIRMED slots, capped at MAX_SLOTS (duplicate/edge rows
+    // must never inflate the hours).
+    const confirmedLogs = attendance_logs.filter(l =>
+      l.attendance_id === todayRecord.attendance_id && l.status === 'confirmed'
+    );
+    const confirmedSlots = Math.min(confirmedLogs.length, MAX_SLOTS);
 
     const totalHours = confirmedSlots;
     const overtimeHours = Math.max(0, totalHours - MAX_SLOTS);
@@ -68,9 +75,9 @@ export async function POST(request) {
       confirmed_slots: confirmedSlots,
       status: status,
       updated_at: nowStr,
-    }, user_id || 1);
+    }, userId);
 
-    await auditLog(user_id || 1, 'checkout', 'Attendance', 'attendance', todayRecord.attendance_id, null, {
+    await auditLog(userId, 'checkout', 'Attendance', 'attendance', todayRecord.attendance_id, null, {
       check_out: nowStr,
       total_hours: totalHours,
       overtime_hours: overtimeHours,

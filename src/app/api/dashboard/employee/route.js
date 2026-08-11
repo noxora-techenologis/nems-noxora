@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
-import { sameDay, sameMonth } from '@/lib/dates';
+import { sameDay, sameMonth, dateKey } from '@/lib/dates';
 
 const WORK_HOURS_PER_DAY = 8;
 const WORK_DAYS_PER_MONTH = 22;
@@ -86,7 +86,11 @@ export async function GET(request) {
     });
 
     const completedTasks = monthTasks.filter(t => t.status === 'completed');
-    const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && dateKey(t.deadline).slice(0, 7) <= currentMonth);
+    const uncompletedTasks = monthTasks.filter(t => {
+      if (t.status === 'completed') return false;
+      const deadline = dateKey(t.deadline);
+      return deadline && deadline.slice(0, 7) <= currentMonth;
+    });
     const delayedTasks = monthTasks.filter(t => t.is_delayed === true || t.is_delayed === 'true');
 
     const taskStats = {
@@ -106,8 +110,11 @@ export async function GET(request) {
     const hourlyRate = Number(employee?.hourly_rate) || 0;
     const basicSalary = Number(employee?.basic_salary) || 0;
 
+    // Hourly employees are already paid only for worked hours
+    // (gross = monthTotalHours × hourlyRate), so deducting absent hours
+    // again would double-penalize — same rule as payroll.js.
     const hourlyRateForAbsence = salaryType === 'hourly'
-      ? hourlyRate
+      ? 0
       : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
 
     const attendanceDeductions = monthAbsentHours * hourlyRateForAbsence;
