@@ -53,6 +53,11 @@ export async function PUT(request) {
     if (!topup) return NextResponse.json({ error: 'طلب غير موجود' }, { status: 404 });
     if (topup.status !== 'pending') return NextResponse.json({ error: 'تم معالجة هذا الطلب مسبقاً' }, { status: 400 });
 
+    // Prevent self-approval
+    if (topup.user_id === user.user_id) {
+      return NextResponse.json({ error: 'لا يمكنك الموافقة على طلب الشحن الخاص بك' }, { status: 403 });
+    }
+
     const approvedBy = user.user_id;
 
     if (action === 'reject') {

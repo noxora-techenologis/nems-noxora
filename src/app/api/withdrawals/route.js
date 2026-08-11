@@ -49,7 +49,7 @@ export async function POST(request) {
       getTable('withdrawal_requests'),
     ]);
 
-    const ownerDists = profitDists.filter(d => d.owner_id === Number(owner_id) && d.payment_status === 'pending');
+    const ownerDists = profitDists.filter(d => d.owner_id === Number(owner_id) && (d.payment_status === 'pending' || d.payment_status === 'paid'));
     const totalDistributed = ownerDists.reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
     const totalWithdrawn = existingWithdrawals
@@ -217,6 +217,26 @@ export async function DELETE(request) {
 
     if (!['ceo', 'admin', 'owner'].includes(roleLower)) {
       return NextResponse.json({ error: 'غير مصرح بالحذف' }, { status: 403 });
+    }
+
+    // If COMPLETED withdrawal is deleted, rollback profit_distributions
+    if (req.status === 'COMPLETED') {
+      const ownerDists = (await getTable('profit_distributions'))
+        .filter(d => d.owner_id === req.owner_id && d.payment_status === 'paid')
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      let remaining = Number(req.amount);
+      for (const dist of ownerDists) {
+        if (remaining <= 0) break;
+        const distAmount = Number(dist.amount);
+        if (distAmount <= remaining) {
+          await query(`UPDATE "profit_distributions" SET "payment_status" = 'pending', "updated_at" = NOW() WHERE "distribution_id" = $1`, [dist.distribution_id]);
+          remaining -= distAmount;
+        } else {
+          await query(`UPDATE "profit_distributions" SET "amount" = $1, "payment_status" = 'pending', "updated_at" = NOW() WHERE "distribution_id" = $2`, [distAmount + remaining, dist.distribution_id]);
+          remaining = 0;
+        }
+      }
     }
 
     await query(`DELETE FROM "withdrawal_requests" WHERE "request_id" = $1`, [_id]);

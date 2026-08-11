@@ -84,7 +84,7 @@ export async function POST(request) {
     const distributionResults = [];
 
     for (const inv of projectInvestments) {
-      const totalInvestedInProject = Number(project.total_invested) || 1;
+      const totalInvestedInProject = projectInvestments.reduce((s, i) => s + (Number(i.amount) || 0), 0) || 1;
       const investmentSharePct = Number(inv.amount) / totalInvestedInProject;
       const investorProfit = investorShare * investmentSharePct;
 

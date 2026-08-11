@@ -145,17 +145,6 @@ export async function PUT(request) {
         [JSON.stringify(newRoles), owner_id]
       );
 
-      // Also update user's secondary_role_name to reflect combined roles
-      const userOwners = await getTable('owners');
-      const updatedOwner = userOwners.find(o => o.owner_id === Number(owner_id));
-      if (updatedOwner && updatedOwner.user_id) {
-        const roleNames = newRoles.filter(r => r !== 'OWNER');
-        await query(
-          `UPDATE "users" SET "role_name" = $1 WHERE "user_id" = $2`,
-          [roleNames.length > 0 ? roleNames.join(', ') : 'Owner', updatedOwner.user_id]
-        );
-      }
-
       const pos = ALL_POSITIONS.find(p => p.code === position_code);
       return NextResponse.json({
         success: true,
@@ -196,15 +185,6 @@ export async function PUT(request) {
             `UPDATE "owners" SET "active_roles" = $1, "secondary_role_name" = $2, "updated_at" = NOW() WHERE "owner_id" = $3`,
             [JSON.stringify(activeRoles), positionCode, req.owner_id]
           );
-
-          // Update user's role_name to reflect all roles
-          if (owner.user_id) {
-            const roleNames = activeRoles.filter(r => r !== 'OWNER');
-            await query(
-              `UPDATE "users" SET "role_name" = $1 WHERE "user_id" = $2`,
-              [roleNames.length > 0 ? roleNames.join(', ') : 'Owner', owner.user_id]
-            );
-          }
         }
       }
 

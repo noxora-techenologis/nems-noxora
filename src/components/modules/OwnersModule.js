@@ -215,7 +215,7 @@ export default function OwnersModule({ session }) {
   const myDists = distributions.filter(d => d.owner_id === (myOwner?.owner_id));
   const totalDistributed = myDists.reduce((s, d) => s + (Number(d.amount) || 0), 0);
   const totalWithdrawn = withdrawals
-    .filter(w => w.status === 'COMPLETED' || w.status === 'APPROVED' || w.status === 'FINANCIALLY_VERIFIED' || w.status === 'PENDING')
+    .filter(w => w.status === 'COMPLETED' || w.status === 'APPROVED')
     .reduce((s, w) => s + (Number(w.amount) || 0), 0);
   const availableBalance = totalDistributed - totalWithdrawn;
 
@@ -309,9 +309,10 @@ export default function OwnersModule({ session }) {
       if (voteResult.success) {
         // Update vote_option counter locally (normally this would recalculate in backend, but we'll sync local state via DB update)
         const optToUpdate = voteOptions.find(o => o.option_id === optionId);
-        if (optToUpdate) {
-          const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
-          const nextWeight = parseFloat((((optToUpdate.votes_count * optToUpdate.weighted_percentage * totalShares / 100) + sharesWeight) / totalShares * 100).toFixed(2));
+        if (optToUpdate && totalShares > 0) {
+          const prevWeightedVotes = (optToUpdate.weighted_percentage / 100) * totalShares;
+          const newWeightedVotes = prevWeightedVotes + sharesWeight;
+          const nextWeight = Math.min(100, Math.round((newWeightedVotes / totalShares) * 10000) / 100);
           await fetch('/api/data/vote_options', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -319,7 +320,7 @@ export default function OwnersModule({ session }) {
               _id: optionId,
               _userId: session.user_id,
               votes_count: optToUpdate.votes_count + 1,
-              weighted_percentage: isNaN(nextWeight) ? 10 : nextWeight,
+              weighted_percentage: isNaN(nextWeight) ? 0 : nextWeight,
             }),
           });
         }
@@ -385,15 +386,12 @@ export default function OwnersModule({ session }) {
 
   const handleApproveShareTxn = async (txnId, approved) => {
     try {
-      const res = await fetch('/api/data/share_transactions', {
-        method: 'PUT',
+      const res = await fetch('/api/share-transactions/approve', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
-          _id: txnId,
-          _userId: session.user_id,
-          status: approved ? 'completed' : 'rejected',
-          approved_by: session.user_id,
-          approved_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+          transactionId: txnId,
+          approved,
         })
       });
       const result = await res.json();
@@ -446,7 +444,6 @@ export default function OwnersModule({ session }) {
 
   const handleUpdateValuation = async (e) => {
     e.preventDefault();
-    if (true) return; // Valuation editing disabled
     try {
       const res = await fetch('/api/data/company_valuation', {
         method: valuation ? 'PUT' : 'POST',
@@ -507,7 +504,7 @@ export default function OwnersModule({ session }) {
 
   const handleDemotePosition = async (positionCode) => {
     const pos = allPositions.find(p => p.code === positionCode);
-    if (!confirm(`هل أنت متأكد من التنازل عن منصب "${pos?.name || positionCode}"؟\nست失去 جميع الصلاحيات المرتبطة بهذا المنصب.`)) return;
+    if (!confirm(`هل أنت متأكد من التنازل عن منصب "${pos?.name || positionCode}"؟\nستفقد جميع الصلاحيات المرتبطة بهذا المنصب.`)) return;
 
     try {
       const res = await fetch('/api/owner-roles', {

@@ -72,20 +72,26 @@ export async function POST(request) {
       return NextResponse.json({ error: `الحد الأدنى للاستثمار: ${project.min_investment} MRU` }, { status: 400 });
     }
 
-    // Check wallet balance
+    // Check wallet balance — use atomic UPDATE to prevent race conditions
     const wallets = await getTable('wallets');
     const wallet = wallets.find(w => w.user_id === Number(userId));
     if (!wallet) return NextResponse.json({ error: 'لا توجد محفظة لك. يرجى شحن المحفظة أولاً.' }, { status: 400 });
-    if (Number(wallet.balance) < investAmount) {
-      return NextResponse.json({ error: `رصيد المحفظة غير كافٍ. المتاح: ${wallet.balance} MRU` }, { status: 400 });
+
+    const currentBalance = Number(wallet.balance);
+    if (currentBalance < investAmount) {
+      return NextResponse.json({ error: `رصيد المحفظة غير كافٍ. المتاح: ${currentBalance} MRU` }, { status: 400 });
     }
 
-    // Deduct from wallet
-    const newBalance = Number(wallet.balance) - investAmount;
-    await updateRecord('wallets', wallet.wallet_id, {
-      balance: newBalance,
-      total_invested: Number(wallet.total_invested || 0) + investAmount,
-    }, Number(userId));
+    // Atomic deduct — only succeeds if balance is still sufficient
+    const newBalance = currentBalance - investAmount;
+    const deductResult = await query(
+      `UPDATE "wallets" SET "balance" = $1, "total_invested" = COALESCE("total_invested", 0) + $2, "updated_at" = NOW()
+       WHERE "wallet_id" = $3 AND "balance" >= $2`,
+      [newBalance, investAmount, wallet.wallet_id]
+    );
+    if (deductResult.rowCount === 0) {
+      return NextResponse.json({ error: 'رصيد المحفظة غير كافٍ — يرجى المحاولة مرة أخرى' }, { status: 400 });
+    }
 
     // Create wallet transaction
     await insertRecord('wallet_transactions', {
@@ -102,7 +108,7 @@ export async function POST(request) {
     // Create investment record
     const newTotalInvested = Number(project.total_invested || 0) + investAmount;
     const investPercentage = project.budget_target > 0
-      ? ((investAmount / Number(project.budget_target)) * 100)
+      ? Math.min(100, (investAmount / Number(project.budget_target)) * 100)
       : 0;
 
     const investment = await insertRecord('project_investments', {

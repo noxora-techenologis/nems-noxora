@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, query } from '@/lib/db';
 import { roundMRU } from '@/lib/fees';
-import { verifySession } from '@/lib/serverAuth';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 
 // GET: Return current valuation state
 export async function GET(request) {
@@ -59,6 +59,8 @@ export async function POST(request) {
   try {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
+    const roleErr = await requireRole(user, ['ceo', 'admin']);
+    if (roleErr) return roleErr;
     const [valuationRows, revenues, expenses, salaries, shares, existingDists] = await Promise.all([
       getTable('company_valuation'),
       getTable('revenues'),
@@ -86,13 +88,19 @@ export async function POST(request) {
       return NextResponse.json({ error: 'لا توجد أرباح جديدة للتوزيع', net_profit: netProfit, distributed: distributedProfit });
     }
 
+    // Idempotency check — prevent duplicate distributions for the same period
+    const currentMonth = new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' });
+    const pendingDists = existingDists.filter(d => d.period === currentMonth && d.payment_status === 'pending');
+    if (pendingDists.length > 0) {
+      return NextResponse.json({ error: 'تم توزيع الأرباح بالفعل لهذا الشهر. لا يمكن التكرار.' }, { status: 400 });
+    }
+
     const toOwners = roundMRU(undistributed * 0.30);
     const toCompany = roundMRU(undistributed * 0.70);
     const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
 
     // Create distribution records for each owner
     const now = new Date().toISOString();
-    const currentMonth = new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' });
 
     for (const sh of shares) {
       const ownerPercentage = Number(sh.ownership_percentage) || 0;
