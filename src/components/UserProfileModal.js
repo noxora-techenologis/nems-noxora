@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { formatCurrency } from '@/lib/format';
 import { SESSION_KEY, getAuthHeaders } from '@/lib/auth';
 
@@ -14,6 +14,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('info'); // info | edit | password
+  const fileInputRef = useRef(null);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -23,21 +24,19 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
   const [pwdError, setPwdError] = useState('');
   const [pwdSuccess, setPwdSuccess] = useState('');
 
-  const handleAvatarChange = (e) => {
+  const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       alert('حجم الصورة يجب أن لا يتجاوز 2 ميغابايت');
       return;
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      // Resize image before storing
+    reader.onloadend = async () => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         const maxSize = 200;
         let w = img.width, h = img.height;
@@ -45,7 +44,23 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
         else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        setAvatar(canvas.toDataURL('image/jpeg', 0.85));
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify({ file: dataUrl, filename: `avatar_${Date.now()}.jpg` }),
+          });
+          const result = await res.json();
+          if (result.success) {
+            setAvatar(result.url);
+          } else {
+            alert(result.error || 'فشل رفع الصورة');
+          }
+        } catch {
+          alert('تعذر رفع الصورة');
+        }
       };
       img.src = reader.result;
     };
@@ -131,6 +146,20 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
     }
   };
 
+  const roleNamesAr = {
+    admin: 'مدير النظام', ceo: 'المدير التنفيذي', fm: 'المدير المالي',
+    hr: 'الموارد البشرية', pm: 'مدير المشاريع', employee: 'موظف', owner: 'مالك',
+    shipping_agent: 'وكيل شحن'
+  };
+
+  const getUserInitials = (name) => {
+    if (!name) return 'N';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'N';
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   if (!user) return null;
 
   const roleColors = {
@@ -139,6 +168,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
   };
   const roleKey = (user.role_name || user.role || 'employee').toLowerCase();
   const roleColor = roleColors[roleKey] || 'var(--noxora-red)';
+  const roleLabel = roleNamesAr[roleKey] || user.role_name || user.role;
 
   return (
     <div style={{
@@ -175,31 +205,48 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
         <div style={{ padding: '0 24px 24px 24px', marginTop: '-50px', position: 'relative' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '12px' }}>
             {/* Avatar with click-to-change on edit tab */}
-            <div style={{ position: 'relative' }}>
-              <div className="user-avatar" style={{
-                width: '90px', height: '90px', fontSize: '32px',
-                border: '4px solid var(--bg-card)', boxShadow: 'var(--shadow-md)',
-                background: `linear-gradient(135deg, ${roleColor}, ${roleColor}aa)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                overflow: 'hidden', borderRadius: '50%'
-              }}>
+            <div style={{ position: 'relative', width: '90px', height: '90px' }}>
+              <div
+                className="user-avatar"
+                style={{
+                  width: '90px', height: '90px', fontSize: '32px',
+                  border: '4px solid var(--bg-card)', boxShadow: 'var(--shadow-md)',
+                  background: `linear-gradient(135deg, ${roleColor}, ${roleColor}aa)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden', borderRadius: '50%',
+                  position: 'absolute', top: 0, left: 0
+                }}
+              >
                 {avatar ? (
                   <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  user.name ? user.name.split(' ').map(w => w[0]).slice(0, 2).join('') : 'N'
+                  getUserInitials(user.name)
                 )}
               </div>
               {activeTab === 'edit' && canEdit && (
-                <label style={{
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  style={{
+                    position: 'absolute', top: 0, left: 0,
+                    width: '90px', height: '90px',
+                    opacity: 0, cursor: 'pointer', zIndex: 10
+                  }}
+                />
+              )}
+              {activeTab === 'edit' && canEdit && (
+                <div style={{
                   position: 'absolute', bottom: 0, right: 0,
                   background: roleColor, borderRadius: '50%',
                   width: '28px', height: '28px', display: 'flex',
                   alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', fontSize: '14px', border: '2px solid var(--bg-card)'
-                }} title="تغيير الصورة">
+                  fontSize: '14px', border: '2px solid var(--bg-card)',
+                  pointerEvents: 'none', zIndex: 11
+                }}>
                   📷
-                  <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
-                </label>
+                </div>
               )}
             </div>
 
@@ -215,7 +262,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
                   onClick={() => setActiveTab('edit')}
                 >✏️ تعديل</button>
               )}
-              {(isSelf || ['admin'].includes(currentUser?.role_name?.toLowerCase())) && (
+              {(isSelf || ['admin', 'ceo', 'hr'].includes(currentUser?.role_name?.toLowerCase())) && (
                 <button
                   className={`btn ${activeTab === 'password' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                   onClick={() => { setActiveTab('password'); setPwdError(''); setPwdSuccess(''); }}
@@ -228,7 +275,7 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)' }}>{user.name}</h2>
               <span className="badge" style={{ background: `${roleColor}22`, color: roleColor, border: `1px solid ${roleColor}44`, fontSize: '11px' }}>
-                {user.role_name || user.role}
+                {roleLabel}
               </span>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
@@ -292,15 +339,28 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', padding: '14px', border: '1px solid var(--border-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: '50%', overflow: 'hidden', background: 'var(--bg-card)', border: '2px solid var(--border-secondary)', flexShrink: 0 }}>
-                  {avatar ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>{name?.[0] || 'N'}</div>}
+                  {avatar ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>{getUserInitials(name)}</div>}
                 </div>
-                <div>
-                  <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', pointerEvents: 'none' }}
+                  >
                     📷 رفع صورة شخصية
-                    <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
-                  </label>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>JPG أو PNG · أقصى حجم 2MB · سيتم ضغطها تلقائياً</p>
+                  </button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    style={{
+                      position: 'absolute', top: 0, left: 0,
+                      width: '100%', height: '100%',
+                      opacity: 0, cursor: 'pointer'
+                    }}
+                  />
                 </div>
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>JPG أو PNG · أقصى حجم 2MB · سيتم ضغطها تلقائياً</p>
                 {avatar && (
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAvatar('')} style={{ marginRight: 'auto' }}>🗑️ حذف</button>
                 )}
@@ -347,8 +407,8 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
                 </div>
               )}
 
-              {/* Admins can skip current password check for other users */}
-              {(isSelf || !['admin'].includes(currentUser?.role_name?.toLowerCase())) && (
+              {/* Privileged roles (admin/ceo/hr) can skip current password for other users */}
+              {(isSelf || ['admin', 'ceo', 'hr'].includes(currentUser?.role_name?.toLowerCase())) && (
                 <div className="form-group">
                   <label className="form-label">كلمة المرور الحالية</label>
                   <input

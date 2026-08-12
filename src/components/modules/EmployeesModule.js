@@ -409,7 +409,7 @@ export default function EmployeesModule({ session }) {
               name: selectedEmp.name || selectedEmp.job_title,
               email: selectedEmp.email || '',
               phone: empUser?.phone || '',
-              role_name: userRole?.name || empUser?.role_name || 'Employee',
+              role_name: userRole?.role_name || empUser?.role_name || 'Employee',
               status: empUser?.status || 'active',
               employee_id: selectedEmp.employee_id,
               job_title: selectedEmp.job_title,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, deleteRecord, SAFE_TABLES } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
+import bcrypt from 'bcryptjs';
 
 // Field whitelist per table — only these fields can be updated via generic PUT
 const ALLOWED_FIELDS = {
@@ -70,6 +71,22 @@ export async function POST(request, { params }) {
       }
       record.sender_id = user.user_id;
       record.message_text = String(record.message_text).trim();
+    }
+
+    // Users: hash password + email uniqueness
+    if (table === 'users') {
+      if (record.password_hash) {
+        if (!String(record.password_hash).startsWith('$2')) {
+          record.password_hash = await bcrypt.hash(String(record.password_hash), 10);
+        }
+      }
+      if (record.email) {
+        const allUsers = await getTable('users');
+        const dup = allUsers.find(u => u.email?.toLowerCase() === record.email.toLowerCase());
+        if (dup) {
+          return NextResponse.json({ error: 'البريد الإلكتروني مستخدم بالفعل' }, { status: 409 });
+        }
+      }
     }
 
     const inserted = await insertRecord(table, record, user.user_id);

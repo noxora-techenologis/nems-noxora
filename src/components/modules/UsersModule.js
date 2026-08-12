@@ -73,6 +73,11 @@ export default function UsersModule({ session }) {
     e.preventDefault();
     if (!name || !email || !password) return;
 
+    if (password.length < 6) {
+      alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+
     const option = allOptions.find(o => o.value === selectedOption) || positionOptions.find(o => o.value === 'EMPLOYEE');
     const roleId = option?.roleId || 6;
     const jobTitle = option?.label || 'موظف';
@@ -137,8 +142,9 @@ export default function UsersModule({ session }) {
           alert('تم إنشاء حساب المالك بنجاح! يمكنه الآن تسجيل الدخول والدخول إلى لوحة الملاك.');
         } else {
           // Auto-create employee record for non-owner roles
+          let empCreated = false;
           try {
-            await fetch('/api/data/employees', {
+            const empRes = await fetch('/api/data/employees', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
               body: JSON.stringify({
@@ -152,8 +158,12 @@ export default function UsersModule({ session }) {
                 _userId: session.user_id,
               }),
             });
-          } catch { /* ignore employee creation errors */ }
-          alert('تم إنشاء حساب المستخدم وإضافته كموظف تلقائياً!');
+            const empResult = await empRes.json();
+            empCreated = empResult.success;
+          } catch { /* ignore */ }
+          alert(empCreated
+            ? 'تم إنشاء حساب المستخدم وإضافته كموظف تلقائياً!'
+            : 'تم إنشاء حساب المستخدم بنجاح. يمكنك إضافة بيانات الموظف يدوياً من وحدة الموظفين.');
         }
 
         setName('');
@@ -170,6 +180,10 @@ export default function UsersModule({ session }) {
   };
 
   const handleToggleStatus = async (userId, currentStatus) => {
+    if (userId === session.user_id) {
+      alert('لا يمكنك إيقاف حسابك الخاص!');
+      return;
+    }
     const nextStatus = currentStatus === 'active' ? 'suspended' : 'active';
     try {
       const res = await fetch('/api/data/users', {
