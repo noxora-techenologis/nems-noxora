@@ -32,6 +32,18 @@ export default function EmployeesModule({ session }) {
   const [deptId, setDeptId] = useState('');
   const [salaryType, setSalaryType] = useState('monthly');
   const [hourlyRate, setHourlyRate] = useState('');
+  const [hireDate, setHireDate] = useState('');
+  const [contractType, setContractType] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [gender, setGender] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [empPhone, setEmpPhone] = useState('');
+  const [empEmail, setEmpEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyRelation, setEmergencyRelation] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const canManage = ['admin', 'ceo', 'hr'].includes(session.role_name?.toLowerCase());
 
@@ -66,12 +78,23 @@ export default function EmployeesModule({ session }) {
   const handleSelect = (emp) => {
     setSelectedEmp(emp);
     setJobTitle(emp.job_title || '');
-    setBasicSalary(emp.basic_salary || '');
-    setAllowances(emp.allowances || '');
+    setBasicSalary(emp.basic_salary ?? emp.salary ?? '');
+    setAllowances(emp.allowances ?? '');
     setEmpStatus(emp.employment_status || 'active');
     setDeptId(emp.department_id || '');
     setSalaryType(emp.salary_type || 'monthly');
-    setHourlyRate(emp.hourly_rate || '');
+    setHourlyRate(emp.hourly_rate ?? '');
+    setHireDate(emp.hire_date ? emp.hire_date.split('T')[0] : '');
+    setContractType(emp.contract_type || '');
+    setNationality(emp.nationality || '');
+    setGender(emp.gender || '');
+    setNationalId(emp.national_id || '');
+    setEmpPhone(emp.phone || '');
+    setEmpEmail(emp.email || '');
+    setAddress(emp.address || '');
+    setEmergencyContact(emp.emergency_contact || '');
+    setEmergencyName(emp.emergency_name || '');
+    setEmergencyRelation(emp.emergency_relation || '');
     setEditing(false);
   };
 
@@ -79,32 +102,53 @@ export default function EmployeesModule({ session }) {
     e.preventDefault();
     if (!selectedEmp) return;
 
+    if (salaryType === 'hourly' && (!hourlyRate || Number(hourlyRate) <= 0)) {
+      alert('يجب إدخال سعر الساعة بشكل صحيح');
+      return;
+    }
+    if (salaryType === 'monthly' && (!basicSalary || Number(basicSalary) <= 0)) {
+      alert('يجب إدخال الراتب الأساسي بشكل صحيح');
+      return;
+    }
+
+    setSaving(true);
     try {
+      const payload = {
+        _id: selectedEmp.employee_id,
+        _userId: session.user_id,
+        job_title: jobTitle,
+        department_id: deptId ? Number(deptId) : null,
+        basic_salary: basicSalary ? Number(basicSalary) : 0,
+        allowances: allowances ? Number(allowances) : 0,
+        employment_status: empStatus,
+        salary_type: salaryType,
+        hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0,
+        hire_date: hireDate || null,
+        contract_type: contractType || null,
+        nationality: nationality || null,
+        gender: gender || null,
+        national_id: nationalId || null,
+        phone: empPhone || null,
+        email: empEmail || null,
+        address: address || null,
+        emergency_contact: emergencyContact || null,
+        emergency_name: emergencyName || null,
+        emergency_relation: emergencyRelation || null,
+      };
+
       const res = await fetch('/api/data/employees', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({
-          _id: selectedEmp.employee_id,
-          _userId: session.user_id,
-          job_title: jobTitle,
-          department_id: deptId ? Number(deptId) : null,
-          basic_salary: basicSalary ? Number(basicSalary) : 0,
-          allowances: allowances ? Number(allowances) : 0,
-          employment_status: empStatus,
-          salary_type: salaryType,
-          hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await res.json();
       if (result.success) {
-        // Update local state
+        const updated = { ...selectedEmp, ...payload };
         setEmployees(employees.map(emp =>
-          emp.employee_id === selectedEmp.employee_id
-            ? { ...emp, job_title: jobTitle, department_id: deptId ? Number(deptId) : null, basic_salary: basicSalary ? Number(basicSalary) : 0, allowances: allowances ? Number(allowances) : 0, employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 }
-            : emp
+          emp.employee_id === selectedEmp.employee_id ? updated : emp
         ));
-        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, department_id: deptId ? Number(deptId) : null, basic_salary: basicSalary ? Number(basicSalary) : 0, allowances: allowances ? Number(allowances) : 0, employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 });
+        setSelectedEmp(updated);
         setEditing(false);
         alert('تم حفظ التعديلات بنجاح!');
       } else {
@@ -112,6 +156,8 @@ export default function EmployeesModule({ session }) {
       }
     } catch {
       alert('تعذر الاتصال بالخادم');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -119,7 +165,8 @@ export default function EmployeesModule({ session }) {
     (emp.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (emp.job_title || '').toLowerCase().includes(search.toLowerCase()) ||
     String(emp.employee_id || '').toLowerCase().includes(search.toLowerCase()) ||
-    (emp.nationality || '').toLowerCase().includes(search.toLowerCase())
+    (emp.nationality || '').toLowerCase().includes(search.toLowerCase()) ||
+    (emp.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) {
@@ -130,7 +177,6 @@ export default function EmployeesModule({ session }) {
     );
   }
 
-  // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   return (
@@ -150,7 +196,7 @@ export default function EmployeesModule({ session }) {
             <div style={{ width: '220px' }}>
               <input
                 type="text"
-                placeholder="بحث بالاسم أو المسمى..."
+                placeholder="بحث بالاسم أو البريد أو المسمى..."
                 className="form-input"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -251,38 +297,54 @@ export default function EmployeesModule({ session }) {
                     )}
                     <div>
                       <div className="form-label">تاريخ التعيين</div>
-                      <div>{selectedEmp.hire_date}</div>
+                      <div>{selectedEmp.hire_date || 'غير محدد'}</div>
                     </div>
                     <div>
                       <div className="form-label">نوع العقد</div>
-                      <div>{selectedEmp.contract_type}</div>
+                      <div>{selectedEmp.contract_type || 'غير محدد'}</div>
                     </div>
                     <div>
                       <div className="form-label">الجنسية</div>
-                      <div>{selectedEmp.nationality}</div>
+                      <div>{selectedEmp.nationality || 'غير محدد'}</div>
                     </div>
                     <div>
                       <div className="form-label">الجنس</div>
                       <div>{selectedEmp.gender === 'male' ? 'ذكر' : selectedEmp.gender === 'female' ? 'أنثى' : 'غير محدد'}</div>
                     </div>
+                    {selectedEmp.national_id && (
+                      <div>
+                        <div className="form-label">رقم الهوية الوطنية</div>
+                        <div>{selectedEmp.national_id}</div>
+                      </div>
+                    )}
+                    {selectedEmp.phone && (
+                      <div>
+                        <div className="form-label">الهاتف</div>
+                        <div>{selectedEmp.phone}</div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="divider" style={{ margin: '8px 0' }} />
 
-                  <div>
-                    <div className="form-label">العنوان</div>
-                    <div style={{ fontSize: '13px' }}>{selectedEmp.address}</div>
-                  </div>
-
-                  <div>
-                    <div className="form-label">جهة الاتصال في الطوارئ</div>
-                    <div style={{ fontSize: '13px' }}>
-                      📞 {selectedEmp.emergency_contact}
-                      {selectedEmp.emergency_name && ` (${selectedEmp.emergency_name} - ${selectedEmp.emergency_relation})`}
+                  {selectedEmp.address && (
+                    <div>
+                      <div className="form-label">العنوان</div>
+                      <div style={{ fontSize: '13px' }}>{selectedEmp.address}</div>
                     </div>
-                  </div>
+                  )}
 
-                  {selectedEmp.epi_score && (
+                  {selectedEmp.emergency_contact && (
+                    <div>
+                      <div className="form-label">جهة الاتصال في الطوارئ</div>
+                      <div style={{ fontSize: '13px' }}>
+                        📞 {selectedEmp.emergency_contact}
+                        {selectedEmp.emergency_name && ` (${selectedEmp.emergency_name} - ${selectedEmp.emergency_relation})`}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedEmp.epi_score > 0 && (
                     <div style={{ marginTop: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                         <span className="form-label">مؤشر أداء الإنتاجية (EPI)</span>
@@ -296,6 +358,11 @@ export default function EmployeesModule({ session }) {
                 </div>
               ) : (
                 <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {/* Basic Info */}
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--noxora-yellow-light)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '6px' }}>
+                    📋 المعلومات الأساسية
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">المسمى الوظيفي</label>
                     <input
@@ -314,7 +381,6 @@ export default function EmployeesModule({ session }) {
                       className="form-select"
                       value={deptId}
                       onChange={e => setDeptId(e.target.value)}
-                      required
                     >
                       <option value="">اختر القسم</option>
                       {departments.map(d => (
@@ -322,6 +388,24 @@ export default function EmployeesModule({ session }) {
                       ))}
                     </select>
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">حالة التعيين</label>
+                    <select
+                      id="edit-emp-status"
+                      className="form-select"
+                      value={empStatus}
+                      onChange={e => setEmpStatus(e.target.value)}
+                    >
+                      <option value="active">نشط</option>
+                      <option value="suspended">موقوف</option>
+                    </select>
+                  </div>
+
+                  {/* Salary Info */}
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--noxora-yellow-light)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '6px', marginTop: '8px' }}>
+                    💰 معلومات الراتب
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">نوع الراتب</label>
                     <select
@@ -344,8 +428,9 @@ export default function EmployeesModule({ session }) {
                         value={hourlyRate}
                         onChange={e => setHourlyRate(e.target.value)}
                         placeholder="مثال: 30"
-                        min="0"
+                        min="0.5"
                         step="0.5"
+                        required
                       />
                     </div>
                   )}
@@ -357,6 +442,7 @@ export default function EmployeesModule({ session }) {
                       className="form-input"
                       value={basicSalary}
                       onChange={e => setBasicSalary(e.target.value)}
+                      min="0"
                       required
                     />
                   </div>
@@ -368,23 +454,156 @@ export default function EmployeesModule({ session }) {
                       className="form-input"
                       value={allowances}
                       onChange={e => setAllowances(e.target.value)}
+                      min="0"
                       required
                     />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">حالة التعيين</label>
-                    <select
-                      id="edit-emp-status"
-                      className="form-select"
-                      value={empStatus}
-                      onChange={e => setEmpStatus(e.target.value)}
-                    >
-                      <option value="active">نشط</option>
-                      <option value="suspended">موقوف</option>
-                    </select>
+
+                  {/* Contract Info */}
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--noxora-yellow-light)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '6px', marginTop: '8px' }}>
+                    📄 معلومات العقد
                   </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">تاريخ التعيين</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={hireDate}
+                        onChange={e => setHireDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">نوع العقد</label>
+                      <select
+                        className="form-select"
+                        value={contractType}
+                        onChange={e => setContractType(e.target.value)}
+                      >
+                        <option value="">غير محدد</option>
+                        <option value="permanent">دائم</option>
+                        <option value="contract">مؤقت</option>
+                        <option value="probation">سنّة تجريبية</option>
+                        <option value="part-time">دوام جزئي</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">الجنسية</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={nationality}
+                        onChange={e => setNationality(e.target.value)}
+                        placeholder="موريتاني..."
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">الجنس</label>
+                      <select
+                        className="form-select"
+                        value={gender}
+                        onChange={e => setGender(e.target.value)}
+                      >
+                        <option value="">غير محدد</option>
+                        <option value="male">ذكر</option>
+                        <option value="female">أنثى</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">رقم الهوية الوطنية</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={nationalId}
+                      onChange={e => setNationalId(e.target.value)}
+                      placeholder="رقم الهوية..."
+                    />
+                  </div>
+
+                  {/* Contact Info */}
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--noxora-yellow-light)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '6px', marginTop: '8px' }}>
+                    📞 معلومات الاتصال
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">الهاتف</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={empPhone}
+                        onChange={e => setEmpPhone(e.target.value)}
+                        placeholder="رقم الهاتف..."
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">البريد الإلكتروني</label>
+                      <input
+                        type="email"
+                        className="form-input"
+                        value={empEmail}
+                        onChange={e => setEmpEmail(e.target.value)}
+                        placeholder="البريد..."
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">العنوان</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                      placeholder="العنوان..."
+                    />
+                  </div>
+
+                  {/* Emergency Contact */}
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--noxora-yellow-light)', borderBottom: '1px solid var(--border-primary)', paddingBottom: '6px', marginTop: '8px' }}>
+                    🆘 جهات الاتصال في الطوارئ
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">رقم الطوارئ</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={emergencyContact}
+                        onChange={e => setEmergencyContact(e.target.value)}
+                        placeholder="رقم الاتصال..."
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">اسم جهات الاتصال</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={emergencyName}
+                        onChange={e => setEmergencyName(e.target.value)}
+                        placeholder="الاسم..."
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">صلة القرابة</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={emergencyRelation}
+                      onChange={e => setEmergencyRelation(e.target.value)}
+                      placeholder="配偶، أب، أخ..."
+                    />
+                  </div>
+
                   <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                    <button id="save-emp-btn" type="submit" className="btn btn-primary" style={{ flex: 1 }}>حفظ التعديلات</button>
+                    <button id="save-emp-btn" type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
+                      {saving ? '⏳ جاري الحفظ...' : '💾 حفظ التعديلات'}
+                    </button>
                     <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>إلغاء</button>
                   </div>
                 </form>
