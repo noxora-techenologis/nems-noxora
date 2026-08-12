@@ -9,6 +9,8 @@ import UserProfileModal from '@/components/UserProfileModal';
 export default function EmployeesModule({ session }) {
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedEmp, setSelectedEmp] = useState(null);
@@ -31,7 +33,7 @@ export default function EmployeesModule({ session }) {
   const [salaryType, setSalaryType] = useState('monthly');
   const [hourlyRate, setHourlyRate] = useState('');
 
-  const canManage = session.role_name.toLowerCase() === 'ceo';
+  const canManage = ['admin', 'ceo', 'hr'].includes(session.role_name?.toLowerCase());
 
   useEffect(() => {
     fetchData();
@@ -40,14 +42,20 @@ export default function EmployeesModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [empRes, deptRes] = await Promise.all([
+      const [empRes, deptRes, usrRes, roleRes] = await Promise.all([
         fetch('/api/data/employees', { headers: getAuthHeaders() }),
         fetch('/api/data/departments', { headers: getAuthHeaders() }),
+        fetch('/api/data/users', { headers: getAuthHeaders() }),
+        fetch('/api/data/roles', { headers: getAuthHeaders() }),
       ]);
       const empData = await empRes.json();
       const deptData = await deptRes.json();
+      const usrData = await usrRes.json();
+      const roleData = await roleRes.json();
       setEmployees(empData.data || []);
       setDepartments(deptData.data || []);
+      setUsers(usrData.data || []);
+      setRoles(roleData.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -79,9 +87,9 @@ export default function EmployeesModule({ session }) {
           _id: selectedEmp.employee_id,
           _userId: session.user_id,
           job_title: jobTitle,
-          department_id: Number(deptId),
-          basic_salary: Number(basicSalary),
-          allowances: Number(allowances),
+          department_id: deptId ? Number(deptId) : null,
+          basic_salary: basicSalary ? Number(basicSalary) : 0,
+          allowances: allowances ? Number(allowances) : 0,
           employment_status: empStatus,
           salary_type: salaryType,
           hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0,
@@ -93,10 +101,10 @@ export default function EmployeesModule({ session }) {
         // Update local state
         setEmployees(employees.map(emp =>
           emp.employee_id === selectedEmp.employee_id
-            ? { ...emp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 }
+            ? { ...emp, job_title: jobTitle, department_id: deptId ? Number(deptId) : null, basic_salary: basicSalary ? Number(basicSalary) : 0, allowances: allowances ? Number(allowances) : 0, employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 }
             : emp
         ));
-        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, department_id: Number(deptId), basic_salary: Number(basicSalary), allowances: Number(allowances), employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 });
+        setSelectedEmp({ ...selectedEmp, job_title: jobTitle, department_id: deptId ? Number(deptId) : null, basic_salary: basicSalary ? Number(basicSalary) : 0, allowances: allowances ? Number(allowances) : 0, employment_status: empStatus, salary_type: salaryType, hourly_rate: salaryType === 'hourly' ? Number(hourlyRate) : 0 });
         setEditing(false);
         alert('تم حفظ التعديلات بنجاح!');
       } else {
@@ -110,7 +118,7 @@ export default function EmployeesModule({ session }) {
   const filtered = employees.filter(emp =>
     (emp.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (emp.job_title || '').toLowerCase().includes(search.toLowerCase()) ||
-    (emp.employee_id || '').toLowerCase().includes(search.toLowerCase()) ||
+    String(emp.employee_id || '').toLowerCase().includes(search.toLowerCase()) ||
     (emp.nationality || '').toLowerCase().includes(search.toLowerCase())
   );
 
@@ -255,7 +263,7 @@ export default function EmployeesModule({ session }) {
                     </div>
                     <div>
                       <div className="form-label">الجنس</div>
-                      <div>{selectedEmp.gender === 'male' ? 'ذكر' : 'أنثى'}</div>
+                      <div>{selectedEmp.gender === 'male' ? 'ذكر' : selectedEmp.gender === 'female' ? 'أنثى' : 'غير محدد'}</div>
                     </div>
                   </div>
 
@@ -391,26 +399,33 @@ export default function EmployeesModule({ session }) {
         </div>
       </div>
 
-      {showProfileModal && selectedEmp && (
-        <UserProfileModal
-          user={{
-            user_id: selectedEmp.user_id,
-            name: selectedEmp.name || selectedEmp.job_title,
-            email: selectedEmp.email || '',
-            phone: selectedEmp.emergency_contact,
-            role_name: 'Employee',
-            employee_id: selectedEmp.employee_id,
-            job_title: selectedEmp.job_title,
-            basic_salary: selectedEmp.basic_salary,
-            epi_score: selectedEmp.epi_score,
-            national_id: selectedEmp.national_id,
-            emergency_contact: selectedEmp.emergency_contact,
-            emergency_name: selectedEmp.emergency_name
-          }}
-          currentUser={session}
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
+      {showProfileModal && selectedEmp && (() => {
+        const empUser = users.find(u => u.user_id === selectedEmp.user_id);
+        const userRole = roles.find(r => r.role_id === empUser?.role_id);
+        return (
+          <UserProfileModal
+            user={{
+              user_id: selectedEmp.user_id,
+              name: selectedEmp.name || selectedEmp.job_title,
+              email: selectedEmp.email || '',
+              phone: empUser?.phone || '',
+              role_name: userRole?.name || empUser?.role_name || 'Employee',
+              status: empUser?.status || 'active',
+              employee_id: selectedEmp.employee_id,
+              job_title: selectedEmp.job_title,
+              department_name: departments.find(d => d.department_id === selectedEmp.department_id)?.name || '',
+              basic_salary: selectedEmp.basic_salary,
+              epi_score: selectedEmp.epi_score,
+              national_id: selectedEmp.national_id,
+              emergency_contact: selectedEmp.emergency_contact,
+              emergency_name: selectedEmp.emergency_name
+            }}
+            currentUser={session}
+            onClose={() => setShowProfileModal(false)}
+            onUpdate={() => fetchData()}
+          />
+        );
+      })()}
     </div>
   );
 }
