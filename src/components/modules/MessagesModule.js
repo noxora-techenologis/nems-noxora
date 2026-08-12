@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { getAuthHeaders } from '@/lib/auth';
 
+const POLL_INTERVAL = 20000;
+
 export default function MessagesModule({ session }) {
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -10,10 +12,17 @@ export default function MessagesModule({ session }) {
   const [loading, setLoading] = useState(true);
   const [activeConv, setActiveConv] = useState(null);
   const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState('project_team');
+  const [creating, setCreating] = useState(false);
   const msgEndRef = useRef(null);
 
   useEffect(() => {
     fetchData();
+    const timer = setInterval(fetchSilent, POLL_INTERVAL);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -21,6 +30,20 @@ export default function MessagesModule({ session }) {
       msgEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, activeConv]);
+
+  const applyConversationData = (convData, msgData, preferConvId) => {
+    setConversations(convData || []);
+    setMessages(msgData || []);
+    setActiveConv(prev => {
+      if (preferConvId) {
+        return convData?.find(c => c.conversation_id === preferConvId) || null;
+      }
+      if (prev && convData?.some(c => c.conversation_id === prev.conversation_id)) {
+        return prev;
+      }
+      return convData?.[0] || null;
+    });
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -34,13 +57,8 @@ export default function MessagesModule({ session }) {
       const msgData = await msgRes.json();
       const userData = await userRes.json();
 
-      setConversations(convData.data || []);
-      setMessages(msgData.data || []);
       setUsers(userData.data || []);
-
-      if (convData.data?.length > 0) {
-        setActiveConv(convData.data[0]);
-      }
+      applyConversationData(convData.data || [], msgData.data || [], null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -48,38 +66,113 @@ export default function MessagesModule({ session }) {
     }
   };
 
+  const fetchSilent = async () => {
+    try {
+      const [convRes, msgRes] = await Promise.all([
+        fetch('/api/data/conversations', { headers: getAuthHeaders() }),
+        fetch('/api/data/messages', { headers: getAuthHeaders() }),
+      ]);
+      const convData = await convRes.json();
+      const msgData = await msgRes.json();
+      applyConversationData(convData.data || [], msgData.data || [], null);
+      if (activeConv) markRead(activeConv);
+    } catch {
+      // silent background refresh — ignore transient errors
+    }
+  };
+
+  const markRead = (conv) => {
+    if (!conv) return;
+    fetch('/api/messages/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ conversation_id: conv.conversation_id }),
+    }).catch(() => {});
+  };
+
+  const openConversation = (c) => {
+    setActiveConv(c);
+    markRead(c);
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!text || !activeConv) return;
+    if (!text.trim() || !activeConv || sending) return;
 
+    setSending(true);
     try {
       const res = await fetch('/api/data/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
-          sender_id: session.user_id,
-          receiver_id: null,
           conversation_id: activeConv.conversation_id,
-          message_text: text,
+          message_text: text.trim(),
           file_id: null,
           is_read: false,
           status: 'sent',
-          _userId: session.user_id,
         }),
       });
 
       const result = await res.json();
       if (result.success) {
         setText('');
-        // Refresh messages list
-        const msgRes = await fetch('/api/data/messages', { headers: getAuthHeaders() });
+        const [convRes, msgRes] = await Promise.all([
+          fetch('/api/data/conversations', { headers: getAuthHeaders() }),
+          fetch('/api/data/messages', { headers: getAuthHeaders() }),
+        ]);
+        const convData = await convRes.json();
         const msgData = await msgRes.json();
-        setMessages(msgData.data || []);
+        applyConversationData(convData.data || [], msgData.data || [], activeConv.conversation_id);
       } else {
         alert(result.error || 'فشلت عملية الإرسال');
       }
     } catch {
       alert('تعذر الاتصال بالخادم');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleCreateConversation = async (e) => {
+    e.preventDefault();
+    if (!newName.trim() || creating) return;
+
+    setCreating(true);
+    try {
+      const res = await fetch('/api/data/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          name: newName.trim(),
+          type: newType,
+          created_by: session.user_id,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        await fetch('/api/data/conversation_members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({
+            conversation_id: result.data.conversation_id,
+            user_id: session.user_id,
+            role: 'owner',
+          }),
+        }).catch(() => {});
+        setNewName('');
+        setShowCreate(false);
+        const convRes = await fetch('/api/data/conversations', { headers: getAuthHeaders() });
+        const convData = await convRes.json();
+        setConversations(convData.data || []);
+        setActiveConv(result.data);
+        markRead(result.data);
+      } else {
+        alert(result.error || 'فشل إنشاء القناة');
+      }
+    } catch {
+      alert('تعذر الاتصال بالخادم');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -90,6 +183,14 @@ export default function MessagesModule({ session }) {
       </div>
     );
   }
+
+  const lastMessageOf = (convId) =>
+    messages.filter(m => m.conversation_id === convId).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).at(-1);
+
+  const unreadOf = (convId) =>
+    messages.filter(m => m.conversation_id === convId && !m.is_read && m.sender_id !== session.user_id).length;
+
+  const timeOf = (ts) => ts ? ts.split(' ')[1] : '';
 
   const activeMessages = activeConv
     ? messages.filter(m => m.conversation_id === activeConv.conversation_id)
@@ -102,31 +203,73 @@ export default function MessagesModule({ session }) {
           <h1 className="page-title">💬 الرسائل والتواصل الفوري الداخلي</h1>
           <p className="page-subtitle">قنوات دردشة للفرق وغرف للتواصل المباشر مع المسؤولين والملاك</p>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowCreate(v => !v)}>
+          {showCreate ? 'إغلاق' : '＋ قناة جديدة'}
+        </button>
       </div>
+
+      {showCreate && (
+        <form onSubmit={handleCreateConversation} className="card" style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            className="form-input"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder="اسم القناة (مثال: فريق المبيعات)"
+            required
+            style={{ flex: 1, minWidth: '200px' }}
+          />
+          <select className="form-input" value={newType} onChange={e => setNewType(e.target.value)} style={{ width: 'auto' }}>
+            <option value="project_team">قناة مشروع/فريق</option>
+            <option value="direct">غرفة مباشرة</option>
+            <option value="management">قناة الإدارة</option>
+          </select>
+          <button type="submit" className="btn btn-primary" disabled={creating}>
+            {creating ? 'جاري الإنشاء...' : 'إنشاء'}
+          </button>
+        </form>
+      )}
 
       <div className="card messages-chat-layout" style={{ padding: 0, height: '72vh', overflow: 'hidden' }}>
         {/* Sidebar: list of chats */}
         <div style={{ borderLeft: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', background: 'rgba(16, 18, 26, 0.4)' }}>
           <div style={{ padding: '20px', fontWeight: 800, borderBottom: '1px solid var(--border-primary)', fontSize: '14.5px', color: 'var(--text-primary)' }}>💬 غرف التواصل المتاحة</div>
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {conversations.map(c => (
-              <div
-                key={c.conversation_id}
-                onClick={() => setActiveConv(c)}
-                style={{
-                  padding: '16px 20px', cursor: 'pointer', borderBottom: '1px solid var(--border-primary)',
-                  background: activeConv?.conversation_id === c.conversation_id ? 'var(--bg-card-hover)' : '',
-                  borderRight: activeConv?.conversation_id === c.conversation_id ? '3px solid var(--noxora-red)' : 'none',
-                  transition: 'all var(--transition-fast)'
-                }}
-                id={`chat-channel-${c.conversation_id}`}
-              >
-                <div style={{ fontWeight: 800, fontSize: '13.5px', color: activeConv?.conversation_id === c.conversation_id ? 'var(--noxora-red-light)' : 'var(--text-primary)', marginBottom: '4px' }}>
-                  {c.type === 'project_team' ? '📂' : '👤'} {c.name}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>آخر تحديث: {c.last_message_at?.split(' ')[1]}</div>
+            {conversations.length === 0 ? (
+              <div style={{ padding: '24px 20px', color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: 1.8 }}>
+                لا توجد قنوات بعد.<br />أنشئ أول قناة من زر «＋ قناة جديدة»
               </div>
-            ))}
+            ) : conversations.map(c => {
+              const unread = unreadOf(c.conversation_id);
+              const last = lastMessageOf(c.conversation_id);
+              return (
+                <div
+                  key={c.conversation_id}
+                  onClick={() => openConversation(c)}
+                  style={{
+                    padding: '16px 20px', cursor: 'pointer', borderBottom: '1px solid var(--border-primary)',
+                    background: activeConv?.conversation_id === c.conversation_id ? 'var(--bg-card-hover)' : '',
+                    borderRight: activeConv?.conversation_id === c.conversation_id ? '3px solid var(--noxora-red)' : 'none',
+                    transition: 'all var(--transition-fast)'
+                  }}
+                  id={`chat-channel-${c.conversation_id}`}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <div style={{ fontWeight: 800, fontSize: '13.5px', color: activeConv?.conversation_id === c.conversation_id ? 'var(--noxora-red-light)' : 'var(--text-primary)' }}>
+                      {c.type === 'project_team' ? '📂' : '👤'} {c.name}
+                    </div>
+                    {unread > 0 && (
+                      <span style={{ background: 'var(--noxora-red)', color: '#fff', borderRadius: '50%', minWidth: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, padding: '0 6px' }}>
+                        {unread}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {last ? `آخر رسالة: ${timeOf(last.created_at)}` : 'لا رسائل بعد'}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -136,7 +279,7 @@ export default function MessagesModule({ session }) {
             {/* Header */}
             <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(16, 18, 26, 0.4)' }}>
               <div style={{ fontWeight: 800, fontSize: '15px' }}>{activeConv.name}</div>
-              <span className="badge badge-muted" style={{ fontSize: '10.5px' }}>قناة {activeConv.type === 'project_team' ? 'مشروع' : 'مباشرة'}</span>
+              <span className="badge badge-muted" style={{ fontSize: '10.5px' }}>قناة {activeConv.type === 'project_team' ? 'مشروع' : activeConv.type === 'direct' ? 'مباشرة' : 'إدارة'}</span>
             </div>
 
             {/* Message lists */}
@@ -166,12 +309,13 @@ export default function MessagesModule({ session }) {
                         color: isMe ? 'white' : 'var(--text-primary)',
                         fontSize: '13.5px', lineHeight: 1.55,
                         boxShadow: isMe ? 'var(--shadow-glow-red)' : 'none',
-                        border: isMe ? 'none' : '1px solid var(--border-primary)'
+                        border: isMe ? 'none' : '1px solid var(--border-primary)',
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word'
                       }}>
                         {m.message_text}
                       </div>
                       <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'left' }}>
-                        {m.created_at?.split(' ')[1]}
+                        {timeOf(m.created_at)} {!isMe && !m.is_read ? '• جديد' : ''}
                       </div>
                     </div>
                   );
@@ -192,12 +336,16 @@ export default function MessagesModule({ session }) {
                 required
                 style={{ flex: 1 }}
               />
-              <button id="send-msg-btn" type="submit" className="btn btn-primary">إرسال 🚀</button>
+              <button id="send-msg-btn" type="submit" className="btn btn-primary" disabled={sending}>
+                {sending ? '...' : 'إرسال 🚀'}
+              </button>
             </form>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
-            اختر محادثة من القائمة الجانبية للبدء
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
+            {conversations.length === 0
+              ? 'لا توجد قنوات بعد — أنشئ أول قناة من الأعلى للبدء'
+              : 'اختر محادثة من القائمة الجانبية للبدء'}
           </div>
         )}
       </div>
