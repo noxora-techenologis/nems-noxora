@@ -55,7 +55,7 @@ export async function POST(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { owner_id, position_code, reason, user_id } = body;
+    const { owner_id, position_code, reason } = body;
 
     if (!owner_id || !position_code) {
       return NextResponse.json({ error: 'بيانات مطلوبة مفقودة' }, { status: 400 });
@@ -97,7 +97,7 @@ export async function POST(request) {
        ("owner_id", "position", "requested_role_name", "reason", "status", "user_id", "created_at", "updated_at")
        VALUES ($1, $2, $3, $4, 'pending', $5, NOW(), NOW())
        RETURNING *`,
-      [owner_id, position_code, pos.name, reason || '', user_id || owner_id]
+      [owner_id, position_code, pos.name, reason || '', user.user_id]
     );
 
     return NextResponse.json({ success: true, data: result.rows[0] }, { status: 201 });

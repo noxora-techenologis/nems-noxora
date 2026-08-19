@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getTable, insertRecord, updateRecord, query } from '@/lib/db';
+import { getTable, insertRecord, updateRecord } from '@/lib/db';
 import { verifySession, requireRole } from '@/lib/serverAuth';
-import { sameMonth, dateKey } from '@/lib/dates';
-
-const WORK_HOURS_PER_DAY = 8;
-const WORK_DAYS_PER_MONTH = 22;
+import { calculateMonthlyPayroll } from '@/lib/payroll';
 
 // GET: Calculate payroll for current or specified month
 // GET /api/payroll?month=2026-07&employeeId=1
@@ -28,100 +25,26 @@ export async function GET(request) {
       getTable('departments'),
     ]);
 
-    const targetEmployees = employeeId
+    const filteredEmployees = employeeId
       ? employees.filter(e => e.employee_id === Number(employeeId))
-      : employees.filter(e => e.employment_status === 'active');
+      : employees;
 
-    const results = [];
+    const { employees: calculatedResults, totals } = calculateMonthlyPayroll(filteredEmployees, attendance, tasks, month);
 
-    for (const emp of targetEmployees) {
-      const empAttendance = attendance.filter(a =>
-        a.employee_id === emp.employee_id && sameMonth(a.date, month)
-      );
-
-      const totalDaysWorked = empAttendance.length;
-      const presentDays = empAttendance.filter(a => a.status !== 'absent').length;
-      const absentDays = empAttendance.filter(a => a.status === 'absent').length;
-
-      const totalHoursWorked = empAttendance.reduce((sum, a) => sum + (Number(a.total_hours) || 0), 0);
-      const totalAbsentHours = empAttendance.reduce((sum, a) => sum + (Number(a.absent_hours) || 0), 0);
-      const totalOvertimeHours = empAttendance.reduce((sum, a) => sum + (Number(a.overtime_hours) || 0), 0);
-
-      const empTasks = tasks.filter(t => t.assigned_to === emp.employee_id);
-      const monthTasks = empTasks.filter(t => {
-        const created = sameMonth(t.created_at, month);
-        const deadline = sameMonth(t.deadline, month);
-        return created || deadline;
-      });
-
-      const completedTasks = monthTasks.filter(t => t.status === 'completed');
-      const uncompletedTasks = monthTasks.filter(t => t.status !== 'completed' && dateKey(t.deadline).slice(0, 7) <= month);
-      const delayedTasks = monthTasks.filter(t => t.is_delayed === true || t.is_delayed === 'true');
-
-      const taskDeductions = uncompletedTasks.reduce((sum, t) => sum + (Number(t.deduction_value) || 0), 0);
-
-      const salaryType = emp.salary_type || 'monthly';
-      const hourlyRate = Number(emp.hourly_rate) || 0;
-      const basicSalary = Number(emp.basic_salary) || 0;
-      const allowances = Number(emp.allowances) || 0;
-
-      let grossSalary = 0;
-      if (salaryType === 'hourly') {
-        grossSalary = totalHoursWorked * hourlyRate;
-      } else {
-        grossSalary = basicSalary;
-      }
-
-      const hourlyRateForAbsence = salaryType === 'hourly'
-        ? 0
-        : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
-
-      const attendanceDeductions = totalAbsentHours * hourlyRateForAbsence;
-      const totalDeductions = attendanceDeductions + taskDeductions;
-      const netSalary = Math.max(0, grossSalary + allowances - totalDeductions);
-
+    const results = calculatedResults.map(r => {
       const existingSalary = salaries.find(s =>
-        s.employee_id === emp.employee_id && s.month === month
+        s.employee_id === r.employee_id && s.month === month
       );
+      const department = departments.find(d => d.department_id === r.department_id);
 
-      const department = departments.find(d => d.department_id === emp.department_id);
-
-      results.push({
-        employee_id: emp.employee_id,
-        employee_name: emp.name,
-        job_title: emp.job_title,
+      return {
+        ...r,
         department: department?.name || '',
-        salary_type: salaryType,
-        hourly_rate: hourlyRate,
-        basic_salary: basicSalary,
-        allowances: allowances,
-        total_hours_worked: totalHoursWorked,
-        total_absent_hours: totalAbsentHours,
-        total_overtime_hours: totalOvertimeHours,
-        total_days_worked: totalDaysWorked,
-        present_days: presentDays,
-        absent_days: absentDays,
-        total_tasks: monthTasks.length,
-        completed_tasks: completedTasks.length,
-        uncompleted_tasks: uncompletedTasks.length,
-        delayed_tasks: delayedTasks.length,
-        gross_salary: grossSalary,
-        attendance_deductions: Math.round(attendanceDeductions * 100) / 100,
-        task_deductions: taskDeductions,
-        total_deductions: Math.round(totalDeductions * 100) / 100,
-        net_salary: Math.round(netSalary * 100) / 100,
         salary_record_exists: !!existingSalary,
         salary_status: existingSalary?.status || null,
         salary_id: existingSalary?.salary_id || null,
-      });
-    }
-
-    const totals = {
-      total_gross: results.reduce((s, r) => s + r.gross_salary, 0),
-      total_deductions: results.reduce((s, r) => s + r.total_deductions, 0),
-      total_net: results.reduce((s, r) => s + r.net_salary, 0),
-      employee_count: results.length,
-    };
+      };
+    });
 
     return NextResponse.json({ month, employees: results, totals });
   } catch (err) {

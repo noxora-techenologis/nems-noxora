@@ -30,7 +30,9 @@ export async function GET(request) {
     const activeProjects = projects.filter(p => p.status === 'active').length;
     const totalRevenue = revenues.filter(r => r.status === 'received').reduce((s, r) => s + r.amount, 0);
     const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-    const totalSalaries = salaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
+    // Only subtract UNPAID salaries — paid salaries are already in expenses table
+    const unpaidSalaries = salaries.filter(s => s.status !== 'paid');
+    const totalSalaries = unpaidSalaries.reduce((s, sal) => s + (Number(sal.net_salary) || 0), 0);
     const todayAttendance = attendance.filter(a => sameDay(a.date, today) && a.status === 'present').length;
     const pendingLeaves = leaves.filter(l => l.status === 'pending').length;
 
@@ -46,8 +48,10 @@ export async function GET(request) {
       budget: p.budget,
     }));
 
-    // Recent announcements
-    const recentAnnouncements = announcements.slice(-3).reverse();
+    // Recent announcements — sort by created_at descending, then take 3
+    const recentAnnouncements = [...announcements]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 3);
 
     // Task stats
     const taskStats = {

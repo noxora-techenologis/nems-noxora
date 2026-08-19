@@ -129,6 +129,25 @@ export async function query(text, params = []) {
   return res.rows;
 }
 
+// ─── Transaction Helper ───
+// Usage: const result = await transaction(async (q) => { ... return value; });
+// q is the same as `query` — use it for all DB calls inside the callback.
+export async function transaction(fn) {
+  if (!usePostgres) throw new Error('DATABASE_URL not configured');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(query);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // ─── Read ───
 export async function getTable(table) {
   validate(table);

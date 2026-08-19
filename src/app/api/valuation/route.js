@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTable, query } from '@/lib/db';
+import { getTable, query, transaction } from '@/lib/db';
 import { roundMRU } from '@/lib/fees';
 import { verifySession, requireRole } from '@/lib/serverAuth';
 
@@ -53,6 +53,7 @@ export async function GET(request) {
       pending_to_company_70: pendingToCompany,
     });
   } catch (err) {
+    console.error('Valuation GET Error:', err);
     return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }
@@ -94,46 +95,55 @@ export async function POST(request) {
       return NextResponse.json({ error: 'لا توجد أرباح جديدة للتوزيع', net_profit: netProfit, distributed: distributedProfit });
     }
 
-    // Idempotency check — prevent duplicate distributions for the same period
-    const currentMonth = new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' });
+    // Idempotency check — use stable YYYY-MM format instead of locale-dependent string
+    const currentMonth = new Date().toISOString().substring(0, 7);
     const pendingDists = existingDists.filter(d => d.period === currentMonth && d.payment_status === 'pending');
     if (pendingDists.length > 0) {
       return NextResponse.json({ error: 'تم توزيع الأرباح بالفعل لهذا الشهر. لا يمكن التكرار.' }, { status: 400 });
     }
 
+    // Fix rounding drift: compute toOwners first, then toCompany = undistributed - toOwners
     const toOwners = roundMRU(undistributed * 0.30);
-    const toCompany = roundMRU(undistributed * 0.70);
+    const toCompany = undistributed - toOwners;
     const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
 
-    // Create distribution records for each owner
-    const now = new Date().toISOString();
+    // Wrap all inserts + valuation update in a single transaction
+    await transaction(async (q) => {
+      const now = new Date().toISOString();
 
-    for (const sh of shares) {
-      const ownerPercentage = Number(sh.ownership_percentage) || 0;
-      const ownerAmount = totalShares > 0 ? roundMRU(toOwners * (Number(sh.total_shares) || 0) / totalShares) : 0;
+      for (const sh of shares) {
+        const ownerPercentage = Number(sh.ownership_percentage) || 0;
+        const ownerAmount = totalShares > 0 ? roundMRU(toOwners * (Number(sh.total_shares) || 0) / totalShares) : 0;
 
-      await query(
-        `INSERT INTO "profit_distributions"
-         ("owner_id", "period", "amount", "total_amount", "currency", "owner_percentage", "status", "payment_status", "created_at", "updated_at")
-         VALUES ($1, $2, $3, $4, 'MRU', $5, 'approved', 'pending', $6, $6)`,
-        [sh.owner_id, currentMonth, ownerAmount, toOwners, ownerPercentage, now]
+        await q(
+          `INSERT INTO "profit_distributions"
+           ("owner_id", "period", "amount", "total_amount", "currency", "owner_percentage", "status", "payment_status", "created_at", "updated_at")
+           VALUES ($1, $2, $3, $4, 'MRU', $5, 'approved', 'pending', $6, $6)`,
+          [sh.owner_id, currentMonth, ownerAmount, toOwners, ownerPercentage, now]
+        );
+      }
+
+      // Update valuation
+      const newRetained = roundMRU(retainedEarnings + toCompany);
+      const newDistributed = roundMRU(distributedProfit + toOwners);
+      const newCompanyValue = capital + newRetained;
+
+      await q(
+        `UPDATE "company_valuation"
+         SET "retained_earnings" = $1, "distributed_profit" = $2,
+             "notes" = $3, "updated_at" = NOW()
+         WHERE "valuation_id" = $4`,
+        [newRetained, newDistributed,
+         `رأس المال: ${capital} | أرباح محتفظ بها: ${newRetained} | أرباح موزعة: ${newDistributed} | إجمالي القيمة: ${newCompanyValue}`,
+         valuationId]
       );
-    }
 
-    // Update valuation
+      return { newRetained, newDistributed, newCompanyValue };
+    });
+
     const newRetained = roundMRU(retainedEarnings + toCompany);
     const newDistributed = roundMRU(distributedProfit + toOwners);
     const newCompanyValue = capital + newRetained;
-
-    await query(
-      `UPDATE "company_valuation"
-       SET "retained_earnings" = $1, "distributed_profit" = $2,
-           "notes" = $3, "updated_at" = NOW()
-       WHERE "valuation_id" = $4`,
-      [newRetained, newDistributed,
-       `رأس المال: ${capital} | أرباح محتفظ بها: ${newRetained} | أرباح موزعة: ${newDistributed} | إجمالي القيمة: ${newCompanyValue}`,
-       valuationId]
-    );
 
     return NextResponse.json({
       success: true,
@@ -145,6 +155,7 @@ export async function POST(request) {
       },
     });
   } catch (err) {
+    console.error('Valuation POST Error:', err);
     return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

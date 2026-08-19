@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTable, insertRecord, query } from '@/lib/db';
+import { getTable, insertRecord, query, transaction } from '@/lib/db';
 import { calcWithdrawalFee, roundMRU } from '@/lib/fees';
 import { verifySession, requireRole } from '@/lib/serverAuth';
 
@@ -100,14 +100,21 @@ async function handleTopup(userId, amount, senderName, screenshotUrl, bankilyTxn
     return NextResponse.json({ error: 'يرجى رفع لقطة شاشة إشعار التحويل' }, { status: 400 });
   }
 
+  // Find existing wallet — do NOT accept owner_id/employee_id from request body
   const wallets = await getTable('wallets');
   let wallet = wallets.find(w => w.user_id === userId);
 
   if (!wallet) {
+    // Create wallet with only user_id — owner_id/employee_id resolved from DB
+    const employees = await getTable('employees');
+    const owners = await getTable('owners');
+    const emp = employees.find(e => e.user_id === userId);
+    const owner = owners.find(o => o.user_id === userId);
+
     wallet = await insertRecord('wallets', {
       user_id: userId,
-      owner_id: ownerId || null,
-      employee_id: employeeId || null,
+      owner_id: owner?.owner_id || null,
+      employee_id: emp?.employee_id || null,
       balance: 0,
     });
   }
@@ -139,57 +146,42 @@ async function handleWithdraw(userId, amount, paymentMethod, accountDetails, not
     return NextResponse.json({ error: 'لا توجد محفظة لك' }, { status: 400 });
   }
 
-  // Calculate withdrawal fee
   const feeInfo = calcWithdrawalFee(amount);
 
-  // Atomic balance check + deduction to prevent race conditions
-  const deductResult = await query(
-    `UPDATE wallets SET balance = balance - $1, updated_at = NOW()
-     WHERE wallet_id = $2 AND balance >= $1 RETURNING *`,
-    [amount, wallet.wallet_id]
-  );
-  if (deductResult.length === 0) {
-    return NextResponse.json({ error: `الرصيد غير كافٍ. المتاح: ${wallet.balance} MRU | المطلوب: ${amount} MRU + عمولة ${feeInfo.fee} MRU = ${feeInfo.netAmount + feeInfo.fee} MRU` }, { status: 400 });
-  }
+  const result = await transaction(async (q) => {
+    // Atomic balance check + deduction + total_withdrawn update
+    const deductResult = await q(
+      `UPDATE "wallets" SET "balance" = "balance" - $1, "total_withdrawn" = COALESCE("total_withdrawn", 0) + $1, "updated_at" = NOW()
+       WHERE "wallet_id" = $2 AND "balance" >= $1 RETURNING *`,
+      [amount, wallet.wallet_id]
+    );
+    if (deductResult.length === 0) throw new Error('INSUFFICIENT_BALANCE');
+    const newBalance = roundMRU(Number(deductResult[0].balance));
 
-  const newBalance = roundMRU(Number(deductResult[0].balance));
-  const { updateRecord } = await import('@/lib/db');
-  await updateRecord('wallets', wallet.wallet_id, {
-    total_withdrawn: roundMRU(Number(wallet.total_withdrawn || 0) + amount),
-  }, userId);
+    await q(
+      `INSERT INTO "wallet_transactions" ("wallet_id","type","amount","balance_after","reference_type","description","status","created_at")
+       VALUES ($1,'withdrawal',$2,$3,'withdrawal_request',$4,'completed',NOW())`,
+      [wallet.wallet_id, amount, newBalance,
+       `سحب ${amount} MRU | عمولة: ${feeInfo.fee} MRU | صافي: ${feeInfo.netAmount} MRU | الوسيلة: ${paymentMethod || 'بنكيلي'} | ${accountDetails || ''} — ${notes || ''}`]
+    );
 
-  // Record the gross withdrawal
-  const txn = await insertRecord('wallet_transactions', {
-    wallet_id: wallet.wallet_id,
-    type: 'withdrawal',
-    amount,
-    balance_after: newBalance,
-    reference_type: 'withdrawal_request',
-    description: `سحب ${amount} MRU | عمولة: ${feeInfo.fee} MRU | صافي: ${feeInfo.netAmount} MRU | الوسيلة: ${paymentMethod || 'بنكيلي'} | ${accountDetails || ''} — ${notes || ''}`,
-    status: 'completed',
-  }, userId);
+    if (feeInfo.fee > 0) {
+      await q(
+        `INSERT INTO "revenues" ("amount","title","type","currency","description","category","date","status","created_by","created_at")
+         VALUES ($1,$2,'عمولة','MRU',$3,'عمولات',$4,'approved',$5,NOW())`,
+        [feeInfo.fee, `عمولة سحب ${amount} MRU`,
+         `عمولة ${feeInfo.feePercent * 100}% على سحب ${amount} MRU — المستخدم: #${userId} — الوسيلة: ${paymentMethod || 'بنكيلي'}`,
+         new Date().toISOString().split('T')[0], userId || 1]
+      );
+    }
 
-  // Record withdrawal fee as company revenue (same as deposit fees)
-  if (feeInfo.fee > 0) {
-    const today = new Date().toISOString().split('T')[0];
-    await insertRecord('revenues', {
-      amount: feeInfo.fee,
-      title: `عمولة سحب ${amount} MRU`,
-      type: 'عمولة',
-      currency: 'MRU',
-      description: `عمولة ${feeInfo.feePercent * 100}% على سحب ${amount} MRU — المستخدم: #${userId} — الوسيلة: ${paymentMethod || 'بنكيلي'}`,
-      category: 'عمولات',
-      date: today,
-      status: 'approved',
-      created_by: userId || 1,
-    }, userId);
-  }
+    return { newBalance };
+  });
 
   return NextResponse.json({
     success: true,
     message: `تم سحب ${amount} MRU من محفظتك. العمولة: ${feeInfo.fee} MRU (${feeInfo.tier}). الصافي: ${feeInfo.netAmount} MRU.`,
-    transaction: txn,
-    new_balance: newBalance,
+    new_balance: result.newBalance,
     fee: feeInfo.fee,
     net_amount: feeInfo.netAmount,
     fee_tier: feeInfo.tier,

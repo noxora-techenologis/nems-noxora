@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTable, updateRecord, auditLog } from '@/lib/db';
+import { getTable, updateRecord, auditLog, query } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
 import { sameDay } from '@/lib/dates';
 
@@ -24,24 +24,27 @@ export async function POST(request) {
     const now = new Date();
     const nowStr = now.toISOString().replace('T', ' ').substring(0, 19);
 
-    const attendance = await getTable('attendance');
-    const todayRecord = attendance.find(a => a.employee_id === employee_id && sameDay(a.date, today));
+    // Use targeted query instead of full table scan
+    const todayRecord = await query(
+      `SELECT * FROM "attendance" WHERE "employee_id" = $1 AND "date" = $2`,
+      [employee_id, today]
+    );
+    const record = todayRecord[0];
 
-    if (!todayRecord) {
+    if (!record) {
       return NextResponse.json({ error: 'لا يوجد سجل حضور لهذا اليوم. يجب تسجيل الدخول أولاً.' }, { status: 404 });
     }
 
-    if (todayRecord.check_out) {
+    if (record.check_out) {
       return NextResponse.json({ error: 'تم تسجيل الانصراف مسبقاً لهذا اليوم.' }, { status: 409 });
     }
 
-    const attendance_logs = await getTable('attendance_logs');
-    // Only count CONFIRMED slots, capped at MAX_SLOTS (duplicate/edge rows
-    // must never inflate the hours).
-    const confirmedLogs = attendance_logs.filter(l =>
-      l.attendance_id === todayRecord.attendance_id && l.status === 'confirmed'
+    // Use targeted query instead of full table scan
+    const confirmedLogs = await query(
+      `SELECT COUNT(*) AS c FROM "attendance_logs" WHERE "attendance_id" = $1 AND "status" = 'confirmed'`,
+      [record.attendance_id]
     );
-    const confirmedSlots = Math.min(confirmedLogs.length, MAX_SLOTS);
+    const confirmedSlots = Math.min(Number(confirmedLogs[0].c), MAX_SLOTS);
 
     const totalHours = confirmedSlots;
     const overtimeHours = Math.max(0, totalHours - MAX_SLOTS);
@@ -67,7 +70,7 @@ export async function POST(request) {
       statusMessage = ` ✓ ${totalHours} ساعات عمل محتسبة، ${absentHours} ساعات غياب.`;
     }
 
-    await updateRecord('attendance', todayRecord.attendance_id, {
+    await updateRecord('attendance', record.attendance_id, {
       check_out: nowStr,
       total_hours: totalHours,
       overtime_hours: overtimeHours,
@@ -77,7 +80,7 @@ export async function POST(request) {
       updated_at: nowStr,
     }, userId);
 
-    await auditLog(userId, 'checkout', 'Attendance', 'attendance', todayRecord.attendance_id, null, {
+    await auditLog(userId, 'checkout', 'Attendance', 'attendance', record.attendance_id, null, {
       check_out: nowStr,
       total_hours: totalHours,
       overtime_hours: overtimeHours,

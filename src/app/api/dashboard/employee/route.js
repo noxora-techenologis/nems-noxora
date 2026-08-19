@@ -102,7 +102,7 @@ export async function GET(request) {
       uncompleted: uncompletedTasks.length,
       productivityRate: monthTasks.length > 0
         ? Math.round((completedTasks.length / monthTasks.length) * 100)
-        : 100,
+        : 0,
     };
 
     // Deductions calculation

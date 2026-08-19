@@ -10,15 +10,21 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const userId = parseInt(searchParams.get('userId') || '0');
 
+    // Default to authenticated user's own notifications when no userId param
+    const targetUserId = userId || user.user_id;
+
     // Users can only fetch their own notifications
-    if (userId && userId !== user.user_id) {
-      return NextResponse.json({ error: 'غير مصرح — لا يمكنك عرض إشعارات مستخدم آخر' }, { status: 403 });
+    if (targetUserId !== user.user_id) {
+      const roles = await getTable('roles');
+      const role = roles.find(r => r.role_id === user.role_id);
+      const roleKey = (user.role_name || role?.role_name || '').toLowerCase();
+      if (!['admin', 'ceo', 'fm'].includes(roleKey)) {
+        return NextResponse.json({ error: 'غير مصرح — لا يمكنك عرض إشعارات مستخدم آخر' }, { status: 403 });
+      }
     }
 
     const notifications = await getTable('notifications');
-    const userNotifs = userId
-      ? notifications.filter(n => n.user_id === userId)
-      : [];
+    const userNotifs = notifications.filter(n => n.user_id === targetUserId);
 
     // Sort by date descending
     userNotifs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));

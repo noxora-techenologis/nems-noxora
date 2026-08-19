@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
-import { verifySession } from '@/lib/serverAuth';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 import { sameDay } from '@/lib/dates';
 
 export async function POST(request) {
   try {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
+
+    const roleErr = await requireRole(user, ['ceo', 'admin', 'fm']);
+    if (roleErr) return roleErr;
 
     const { prompt } = await request.json();
     if (!prompt) {
@@ -108,6 +111,7 @@ export async function POST(request) {
     });
 
   } catch (err) {
+    console.error('AI POST Error:', err);
     return NextResponse.json({
       reply: 'عذراً، حدث خطأ أثناء تحليل البيانات. يرجى المحاولة لاحقاً.'
     });
