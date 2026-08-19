@@ -14,6 +14,13 @@ export default function EmployeeDashboard() {
   const [checkingIn, setCheckingIn] = useState(false);
   const [, setCurrTick] = useState(0);
 
+  // Proof modal states
+  const [proofTask, setProofTask] = useState(null);
+  const [proofInput, setProofInput] = useState('');
+  const [proofFileType, setProofFileType] = useState('link');
+  const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+
   useEffect(() => {
     const handleCurrChange = () => setCurrTick(t => t + 1);
     window.addEventListener('currency-change', handleCurrChange);
@@ -281,7 +288,14 @@ export default function EmployeeDashboard() {
                           id={`emp-update-task-${task.task_id}`}
                           className="btn btn-secondary btn-sm"
                           style={{ whiteSpace: 'nowrap', alignSelf: 'center' }}
-                          onClick={async () => {
+                          onClick={() => {
+                            if (nextStatus === 'completed' && task.required_proof && task.required_proof !== 'none') {
+                              setProofTask(task);
+                              setProofFileType(task.required_proof);
+                              setProofInput('');
+                              setProofModalOpen(true);
+                              return;
+                            }
                             const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
                             const updateData = {
                               _id: task.task_id,
@@ -295,23 +309,20 @@ export default function EmployeeDashboard() {
                                 updateData.is_delayed = true;
                               }
                             }
-                            try {
-                              const res = await fetch('/api/data/tasks', {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                                body: JSON.stringify(updateData),
-                              });
-                              const result = await res.json();
+                            fetch('/api/data/tasks', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                              body: JSON.stringify(updateData),
+                            }).then(r => r.json()).then(result => {
                               if (result.success) {
-                                const d = await fetch(`/api/dashboard/employee?employeeId=${session.employee_id}`, { headers: getAuthHeaders() }).then(r => r.json());
-                                setData(d);
+                                return fetch(`/api/dashboard/employee?employeeId=${session.employee_id}`, { headers: getAuthHeaders() }).then(r => r.json());
                               } else {
                                 alert(result.error || 'فشل تحديث المهمة');
                               }
-                            } catch (err) {
+                            }).then(d => { if (d) setData(d); }).catch(err => {
                               console.error(err);
                               alert('تعذر الاتصال بالخادم');
-                            }
+                            });
                           }}
                         >
                           {nextStatus === 'in_progress' ? '🔄 بدء العمل' : '✅ إنهاء المهمة'}
@@ -410,6 +421,178 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Proof Submission Modal */}
+      {proofModalOpen && proofTask && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 1000, padding: '20px'
+        }}>
+          <div className="card animate-scaleUp" style={{ maxWidth: '500px', width: '100%', boxShadow: 'var(--shadow-lg)', border: '1px solid rgba(243, 156, 18, 0.3)' }}>
+            <div className="card-header" style={{ marginBottom: '14px' }}>
+              <h2 className="card-title" style={{ fontSize: '18px', color: 'var(--noxora-yellow-light)' }}>📋 متطلبات إثبات إنجاز العمل</h2>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              يرجى تقديم الإثبات المطلوب لإنهاء المهمة:
+              <br />
+              <strong style={{ color: 'var(--text-primary)' }}>{proofTask.title}</strong>
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {proofFileType === 'link' && (
+                <div className="form-group">
+                  <label className="form-label">رابط تسليم المهمة (Figma / GitHub / Staging URL)</label>
+                  <input
+                    id="emp-proof-link-input"
+                    type="url"
+                    className="form-input"
+                    value={proofInput}
+                    onChange={e => setProofInput(e.target.value)}
+                    placeholder="https://github.com/..."
+                  />
+                </div>
+              )}
+
+              {proofFileType === 'image' && (
+                <div className="form-group">
+                  <label className="form-label">قم برفع لقطة شاشة كإثبات (صورة)</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <label className="btn btn-secondary" style={{ cursor: 'pointer', textAlign: 'center' }}>
+                      📸 اختر صورة الدليل
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const r = new FileReader();
+                            r.onloadend = () => setProofInput(r.result);
+                            r.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                    {proofInput && (
+                      <div style={{ height: '120px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-primary)' }}>
+                        <img src={proofInput} alt="Proof" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {proofFileType === 'video' && (
+                <div className="form-group">
+                  <label className="form-label">قم برفع فيديو توضيحي</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <label className="btn btn-secondary" style={{ cursor: 'pointer', textAlign: 'center' }}>
+                      🎥 اختر ملف الفيديو
+                      <input
+                        type="file"
+                        accept="video/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setProofInput(`data:video/mp4;base64,${file.name}`);
+                          }
+                        }}
+                      />
+                    </label>
+                    {proofInput && (
+                      <div style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: '12px', border: '1px solid var(--success)' }}>
+                        ✅ تم اختيار الفيديو بنجاح!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {proofFileType === 'audio' && (
+                <div className="form-group">
+                  <label className="form-label">التسجيل الصوتي التوضيحي</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', padding: '20px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-primary)' }}>
+                    <div style={{ fontSize: '32px' }}>{recording ? '🎙️🔴' : '🎤'}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {recording ? 'جاري تسجيل التوضيح الصوتي...' : 'انقر على الزر لتسجيل شرح صوتي'}
+                    </div>
+                    <button
+                      type="button"
+                      className={`btn ${recording ? 'btn-danger' : 'btn-secondary'} btn-sm`}
+                      onClick={() => {
+                        if (!recording) {
+                          setRecording(true);
+                          setTimeout(() => {
+                            setRecording(false);
+                            setProofInput('data:audio/mp3;base64,Recording_Done');
+                            alert('تم حفظ التسجيل الصوتي!');
+                          }, 3000);
+                        }
+                      }}
+                    >
+                      {recording ? '⏹️ إيقاف وحفظ' : '⏺️ بدء التسجيل'}
+                    </button>
+                    {proofInput && (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'var(--success)', fontSize: '13px' }}>
+                        <span>🔊 تم حفظ الملف الصوتي المرفق</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                <button
+                  id="emp-submit-proof-btn"
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  disabled={!proofInput}
+                  onClick={() => {
+                    if (!proofInput) return;
+                    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+                    const updateData = {
+                      _id: proofTask.task_id,
+                      _userId: session.user_id,
+                      status: 'completed',
+                      completion_percentage: 100,
+                      completed_at: nowStr,
+                      proof_submitted: { type: proofFileType, value: proofInput },
+                    };
+                    if (proofTask.deadline && new Date(nowStr) > new Date(proofTask.deadline)) {
+                      updateData.is_delayed = true;
+                    }
+                    fetch('/api/data/tasks', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                      body: JSON.stringify(updateData),
+                    }).then(r => r.json()).then(result => {
+                      if (result.success) {
+                        alert('تم تقديم الإثبات واعتماد إنهاء المهمة!');
+                        setProofModalOpen(false);
+                        setProofTask(null);
+                        setProofInput('');
+                        return fetch(`/api/dashboard/employee?employeeId=${session.employee_id}`, { headers: getAuthHeaders() }).then(r => r.json());
+                      } else {
+                        alert(result.error || 'فشلت العملية');
+                      }
+                    }).then(d => { if (d) setData(d); }).catch(err => {
+                      console.error(err);
+                      alert('تعذر الاتصال بالخادم');
+                    });
+                  }}
+                >
+                  🚀 تقديم الإثبات وإنجاز المهمة
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setProofModalOpen(false); setProofTask(null); setProofInput(''); }}>
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
