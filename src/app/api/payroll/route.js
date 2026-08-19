@@ -14,7 +14,9 @@ export async function GET(request) {
     if (authError) return authError;
 
     const roleErr = await requireRole(user, ['ceo', 'admin', 'hr', 'fm']);
-    if (roleErr) return roleErr; = new URL(request.url);
+    if (roleErr) return roleErr;
+
+    const { searchParams } = new URL(request.url);
     const month = searchParams.get('month') || new Date().toISOString().substring(0, 7);
     const employeeId = searchParams.get('employeeId');
 
