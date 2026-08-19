@@ -20,6 +20,21 @@ const TABLE_ROLES = {
   permissions: ['admin'],
 };
 
+// Resolve the user's actual role name from the roles table (users.role_name is not populated)
+async function getUserRoleName(user) {
+  if (user.role_name) return user.role_name.toLowerCase();
+  const roles = await getTable('roles');
+  const role = roles.find(r => r.role_id === user.role_id);
+  return (role?.role_name || '').toLowerCase();
+}
+
+async function hasTableAccess(user, table) {
+  const requiredRoles = TABLE_ROLES[table];
+  if (!requiredRoles) return true;
+  const userRole = await getUserRoleName(user);
+  return requiredRoles.includes(userRole);
+}
+
 export async function GET(request, { params }) {
   try {
     const { user, error: authError } = await verifySession(request);
@@ -32,12 +47,8 @@ export async function GET(request, { params }) {
     }
 
     // Check role-based access for sensitive tables
-    const requiredRoles = TABLE_ROLES[table];
-    if (requiredRoles) {
-      const userRole = (user.role_name || '').toLowerCase();
-      if (!requiredRoles.includes(userRole)) {
-        return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
-      }
+    if (!(await hasTableAccess(user, table))) {
+      return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
     }
 
     const data = await getTable(table);
@@ -77,12 +88,8 @@ export async function POST(request, { params }) {
     }
 
     // Check role-based access for sensitive tables
-    const requiredRoles = TABLE_ROLES[table];
-    if (requiredRoles) {
-      const userRole = (user.role_name || '').toLowerCase();
-      if (!requiredRoles.includes(userRole)) {
-        return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
-      }
+    if (!(await hasTableAccess(user, table))) {
+      return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -144,7 +151,8 @@ export async function PUT(request, { params }) {
     // For users table: enforce authorization and field whitelist
     if (table === 'users') {
       const isSelf = user.user_id === Number(_id);
-      const isPrivileged = USER_EDIT_ROLES.includes((user.role_name || '').toLowerCase());
+      const userRole = await getUserRoleName(user);
+      const isPrivileged = USER_EDIT_ROLES.includes(userRole);
       if (!isSelf && !isPrivileged) {
         return NextResponse.json({ error: 'لا تملك صلاحية تعديل حساب مستخدم آخر' }, { status: 403 });
       }
@@ -207,12 +215,8 @@ export async function DELETE(request, { params }) {
     }
 
     // Check role-based access for sensitive tables
-    const requiredRoles = TABLE_ROLES[table];
-    if (requiredRoles) {
-      const userRole = (user.role_name || '').toLowerCase();
-      if (!requiredRoles.includes(userRole)) {
-        return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
-      }
+    if (!(await hasTableAccess(user, table))) {
+      return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
