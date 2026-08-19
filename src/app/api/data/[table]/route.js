@@ -185,7 +185,12 @@ export async function PUT(request, { params }) {
     }
 
     // Non-users tables: block sensitive fields from being updated
-    const BLOCKED_FIELDS = new Set(['password_hash', 'created_at', 'role_id', 'status']);
+    // Allow 'status' for tasks (task lifecycle), block for other tables
+    const TABLE_BLOCKED_FIELDS = {
+      tasks: new Set(['password_hash', 'created_at', 'role_id']),
+    };
+    const defaultBlocked = new Set(['password_hash', 'created_at', 'role_id', 'status']);
+    const BLOCKED_FIELDS = TABLE_BLOCKED_FIELDS[table] || defaultBlocked;
     const sanitizedFields = {};
     for (const key of Object.keys(fields)) {
       if (!BLOCKED_FIELDS.has(key)) sanitizedFields[key] = fields[key];

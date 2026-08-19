@@ -683,160 +683,6 @@ export default function ProjectsModule({ session }) {
               )}
             </div>
 
-            {/* Investment & Governance Section (for investable projects) */}
-            {selectedProj.is_investable && selectedProj.status !== 'completed' && selectedProj.status !== 'closed' && (
-              <div className="card" style={{ marginTop: '16px' }}>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border-primary)', paddingBottom: '12px', flexWrap: 'wrap' }}>
-                  <button className={`btn ${investTab === 'investors' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setInvestTab('investors')}>
-                    📊 المستثمرون ({investors.length})
-                  </button>
-                  <button className={`btn ${investTab === 'propose' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setInvestTab('propose')}>
-                    💡 مقترحات ({proposals.length})
-                  </button>
-                  {canCreateProject && (
-                    <button className={`btn ${investTab === 'close' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setInvestTab('close')}>
-                      🔒 إغلاق المشروع
-                    </button>
-                  )}
-                </div>
-
-                {/* Investors Tab */}
-                {investTab === 'investors' && (
-                  <div>
-                    {/* Invest Form */}
-                    <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '16px', border: '1px solid var(--border-accent)' }}>
-                      <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '10px', color: 'var(--info)' }}>📈 استثمار في هذا المشروع</h3>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-                        <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                          <label className="form-label">المبلغ (MRU) — الحد الأدنى: {formatCurrency(selectedProj.min_investment)}</label>
-                          <input type="number" className="form-input" value={investAmount} onChange={e => setInvestAmount(e.target.value)} placeholder="أدخل المبلغ..." min={selectedProj.min_investment || 1} />
-                        </div>
-                        <button className="btn btn-primary btn-sm" onClick={handleInvest} style={{ height: '40px' }}>💰 استثمار</button>
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                        سيتم خصم المبلغ من محفظتك مباشرة. الميزانية المستهدفة: {formatCurrency(selectedProj.budget_target)} | المُستثمَر حالياً: {formatCurrency(selectedProj.total_invested)}
-                      </div>
-                    </div>
-
-                    {/* Investors List */}
-                    {investors.length === 0 ? (
-                      <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>لا يوجد مستثمرون بعد</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {investors.map(inv => (
-                          <div key={inv.investment_id} style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: '12px', borderRadius: 'var(--radius-md)',
-                            background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)',
-                          }}>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '13px' }}>{inv.user_name}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                {new Date(inv.invested_at).toLocaleDateString('ar-SA')}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'left' }}>
-                              <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--info)' }}>{formatCurrency(inv.amount)}</div>
-                              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{inv.investment_percentage?.toFixed(2)}% من المشروع</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Proposals Tab */}
-                {investTab === 'propose' && (
-                  <div>
-                    {/* New Proposal Form */}
-                    <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '16px', border: '1px dashed var(--border-accent)' }}>
-                      <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '10px' }}>💡 اقتراح جديد</h3>
-                      <div className="form-group">
-                        <input type="text" className="form-input" value={newProposalTitle} onChange={e => setNewProposalTitle(e.target.value)} placeholder="عنوان المقترح..." />
-                      </div>
-                      <div className="form-group">
-                        <textarea className="form-textarea" value={newProposalDesc} onChange={e => setNewProposalDesc(e.target.value)} placeholder="تفاصيل المقترح والاقتراحات..." style={{ minHeight: '60px' }} />
-                      </div>
-                      <button className="btn btn-primary btn-sm" onClick={handleCreateProposal}>📤 نشر المقترح</button>
-                    </div>
-
-                    {/* Proposals List */}
-                    {proposals.length === 0 ? (
-                      <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد مقترحات بعد</div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {proposals.map(prop => (
-                          <div key={prop.proposal_id} style={{
-                            padding: '16px', borderRadius: 'var(--radius-md)',
-                            background: 'var(--bg-secondary)', border: `1px solid ${prop.passed ? 'var(--success)' : 'var(--border-primary)'}`,
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                              <div>
-                                <div style={{ fontWeight: 800, fontSize: '14px' }}>{prop.title}</div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                  بواسطة: #{prop.user_id} — {new Date(prop.created_at).toLocaleDateString('ar-SA')}
-                                </div>
-                              </div>
-                              <span className={`badge ${prop.passed ? 'badge-success' : 'badge-warning'}`}>
-                                {prop.passed ? '✅ مقبول' : '⏳ قيد التصويت'}
-                              </span>
-                            </div>
-                            {prop.description && <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>{prop.description}</p>}
-                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', marginBottom: '10px' }}>
-                              <span style={{ color: 'var(--success)' }}>👍 موافق: {prop.approve_count} ({prop.approve_weight?.toFixed(1)}%)</span>
-                              <span style={{ color: 'var(--danger)' }}>👎 معترض: {prop.object_count} ({prop.object_weight?.toFixed(1)}%)</span>
-                            </div>
-                            {/* Vote Buttons */}
-                            {!prop.votes?.some(v => v.user_id === session.user_id) && (
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="btn btn-sm" style={{ background: 'var(--success)', color: '#fff', borderColor: 'var(--success)' }} onClick={() => handleVote(prop.proposal_id, 'approve')}>
-                                  👍 موافق
-                                </button>
-                                <button className="btn btn-danger btn-sm" onClick={() => handleVote(prop.proposal_id, 'object')}>
-                                  👎 معترض
-                                </button>
-                              </div>
-                            )}
-                            {prop.votes?.some(v => v.user_id === session.user_id) && (
-                              <div style={{ fontSize: '11px', color: 'var(--info)', fontWeight: 700 }}>✓ لقد تصويت مسبقاً</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Close Project Tab (CEO only) */}
-                {investTab === 'close' && canCreateProject && (
-                  <div style={{ padding: '16px', background: 'rgba(192,57,43,0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(192,57,43,0.2)' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--danger)', marginBottom: '12px' }}>🔒 إغلاق المشروع وتوزيع الأرباح</h3>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
-                      عند الإغلاق، سيتم تقسيم الأرباح تلقائياً:<br />
-                      • <strong>50%</strong> للشركة (ترتفع القيمة السوقية)<br />
-                      • <strong>50%</strong> للمستثمرين حسب نسبة مساهمتهم المالية
-                    </p>
-                    <div className="form-group">
-                      <label className="form-label">صافي أرباح المشروع (MRU)</label>
-                      <input type="number" className="form-input" value={closeProfit} onChange={e => setCloseProfit(e.target.value)} placeholder="0" min="0" />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '12px 0', fontSize: '13px' }}>
-                      <div style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>حصة الشركة (50%)</div>
-                        <div style={{ fontWeight: 800, color: 'var(--success)' }}>{formatCurrency((Number(closeProfit) || 0) * 0.5)}</div>
-                      </div>
-                      <div style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>حصة المستثمرين (50%)</div>
-                        <div style={{ fontWeight: 800, color: 'var(--info)' }}>{formatCurrency((Number(closeProfit) || 0) * 0.5)}</div>
-                      </div>
-                    </div>
-                    <button className="btn btn-danger" onClick={handleCloseProject}>🔒 إغلاق المشروع وتوزيع الأرباح</button>
-                  </div>
-                )}
-              </div>
-            )}
-
                               {/* Attached Media for Employees (Videos / Content to Publish) */}
                               {t.attached_media && t.attached_media.url && (
                                 <div style={{
@@ -1056,6 +902,155 @@ export default function ProjectsModule({ session }) {
                     <button type="button" className="btn btn-secondary" onClick={() => setShowTaskForm(false)}>إلغاء</button>
                   </div>
                 </form>
+              )}
+
+              {/* Investment & Governance Section (for investable projects) */}
+              {selectedProj.is_investable && selectedProj.status !== 'completed' && selectedProj.status !== 'closed' && (
+                <div className="card" style={{ marginTop: '16px' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border-primary)', paddingBottom: '12px', flexWrap: 'wrap' }}>
+                    <button className={`btn ${investTab === 'investors' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setInvestTab('investors')}>
+                      📊 المستثمرون ({investors.length})
+                    </button>
+                    <button className={`btn ${investTab === 'propose' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setInvestTab('propose')}>
+                      💡 مقترحات ({proposals.length})
+                    </button>
+                    {canCreateProject && (
+                      <button className={`btn ${investTab === 'close' ? 'btn-primary' : 'btn-secondary'} btn-sm`} onClick={() => setInvestTab('close')}>
+                        🔒 إغلاق المشروع
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Investors Tab */}
+                  {investTab === 'investors' && (
+                    <div>
+                      <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '16px', border: '1px solid var(--border-accent)' }}>
+                        <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '10px', color: 'var(--info)' }}>📈 استثمار في هذا المشروع</h3>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+                          <div className="form-group" style={{ margin: 0, flex: 1 }}>
+                            <label className="form-label">المبلغ (MRU) — الحد الأدنى: {formatCurrency(selectedProj.min_investment)}</label>
+                            <input type="number" className="form-input" value={investAmount} onChange={e => setInvestAmount(e.target.value)} placeholder="أدخل المبلغ..." min={selectedProj.min_investment || 1} />
+                          </div>
+                          <button className="btn btn-primary btn-sm" onClick={handleInvest} style={{ height: '40px' }}>💰 استثمار</button>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                          سيتم خصم المبلغ من محفظتك مباشرة. الميزانية المستهدفة: {formatCurrency(selectedProj.budget_target)} | المُستثمَر حالياً: {formatCurrency(selectedProj.total_invested)}
+                        </div>
+                      </div>
+
+                      {investors.length === 0 ? (
+                        <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>لا يوجد مستثمرون بعد</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {investors.map(inv => (
+                            <div key={inv.investment_id} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              padding: '12px', borderRadius: 'var(--radius-md)',
+                              background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)',
+                            }}>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '13px' }}>{inv.user_name}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  {new Date(inv.invested_at).toLocaleDateString('ar-SA')}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--info)' }}>{formatCurrency(inv.amount)}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{inv.investment_percentage?.toFixed(2)}% من المشروع</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Proposals Tab */}
+                  {investTab === 'propose' && (
+                    <div>
+                      <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '16px', border: '1px dashed var(--border-accent)' }}>
+                        <h3 style={{ fontSize: '14px', fontWeight: 800, marginBottom: '10px' }}>💡 اقتراح جديد</h3>
+                        <div className="form-group">
+                          <input type="text" className="form-input" value={newProposalTitle} onChange={e => setNewProposalTitle(e.target.value)} placeholder="عنوان المقترح..." />
+                        </div>
+                        <div className="form-group">
+                          <textarea className="form-textarea" value={newProposalDesc} onChange={e => setNewProposalDesc(e.target.value)} placeholder="تفاصيل المقترح والاقتراحات..." style={{ minHeight: '60px' }} />
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={handleCreateProposal}>📤 نشر المقترح</button>
+                      </div>
+
+                      {proposals.length === 0 ? (
+                        <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد مقترحات بعد</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {proposals.map(prop => (
+                            <div key={prop.proposal_id} style={{
+                              padding: '16px', borderRadius: 'var(--radius-md)',
+                              background: 'var(--bg-secondary)', border: `1px solid ${prop.passed ? 'var(--success)' : 'var(--border-primary)'}`,
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '14px' }}>{prop.title}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    بواسطة: #{prop.user_id} — {new Date(prop.created_at).toLocaleDateString('ar-SA')}
+                                  </div>
+                                </div>
+                                <span className={`badge ${prop.passed ? 'badge-success' : 'badge-warning'}`}>
+                                  {prop.passed ? '✅ مقبول' : '⏳ قيد التصويت'}
+                                </span>
+                              </div>
+                              {prop.description && <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>{prop.description}</p>}
+                              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', marginBottom: '10px' }}>
+                                <span style={{ color: 'var(--success)' }}>👍 موافق: {prop.approve_count} ({prop.approve_weight?.toFixed(1)}%)</span>
+                                <span style={{ color: 'var(--danger)' }}>👎 معترض: {prop.object_count} ({prop.object_weight?.toFixed(1)}%)</span>
+                              </div>
+                              {!prop.votes?.some(v => v.user_id === session.user_id) && (
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button className="btn btn-sm" style={{ background: 'var(--success)', color: '#fff', borderColor: 'var(--success)' }} onClick={() => handleVote(prop.proposal_id, 'approve')}>
+                                    👍 موافق
+                                  </button>
+                                  <button className="btn btn-danger btn-sm" onClick={() => handleVote(prop.proposal_id, 'object')}>
+                                    👎 معترض
+                                  </button>
+                                </div>
+                              )}
+                              {prop.votes?.some(v => v.user_id === session.user_id) && (
+                                <div style={{ fontSize: '11px', color: 'var(--info)', fontWeight: 700 }}>✓ لقد تصويت مسبقاً</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Close Project Tab (CEO only) */}
+                  {investTab === 'close' && canCreateProject && (
+                    <div style={{ padding: '16px', background: 'rgba(192,57,43,0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(192,57,43,0.2)' }}>
+                      <h3 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--danger)', marginBottom: '12px' }}>🔒 إغلاق المشروع وتوزيع الأرباح</h3>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
+                        عند الإغلاق، سيتم تقسيم الأرباح تلقائياً:<br />
+                        • <strong>50%</strong> للشركة (ترتفع القيمة السوقية)<br />
+                        • <strong>50%</strong> للمستثمرين حسب نسبة مساهمتهم المالية
+                      </p>
+                      <div className="form-group">
+                        <label className="form-label">صافي أرباح المشروع (MRU)</label>
+                        <input type="number" className="form-input" value={closeProfit} onChange={e => setCloseProfit(e.target.value)} placeholder="0" min="0" />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '12px 0', fontSize: '13px' }}>
+                        <div style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>حصة الشركة (50%)</div>
+                          <div style={{ fontWeight: 800, color: 'var(--success)' }}>{formatCurrency((Number(closeProfit) || 0) * 0.5)}</div>
+                        </div>
+                        <div style={{ padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>حصة المستثمرين (50%)</div>
+                          <div style={{ fontWeight: 800, color: 'var(--info)' }}>{formatCurrency((Number(closeProfit) || 0) * 0.5)}</div>
+                        </div>
+                      </div>
+                      <button className="btn btn-danger" onClick={handleCloseProject}>🔒 إغلاق المشروع وتوزيع الأرباح</button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ) : (
