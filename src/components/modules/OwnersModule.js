@@ -55,6 +55,9 @@ export default function OwnersModule({ session }) {
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [showOwnerProfile, setShowOwnerProfile] = useState(false);
+  const [editAssets, setEditAssets] = useState('');
+  const [editLiabilities, setEditLiabilities] = useState('');
+  const [editNotes, setEditNotes] = useState('');
 
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';

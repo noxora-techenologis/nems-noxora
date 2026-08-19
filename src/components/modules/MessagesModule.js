@@ -88,7 +88,7 @@ export default function MessagesModule({ session }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ conversation_id: conv.conversation_id }),
-        }).catch(err => console.error('Failed to create conversation:', err));
+        }).catch(err => console.error('Failed to mark as read:', err));
   };
 
   const openConversation = (c) => {
@@ -160,7 +160,7 @@ export default function MessagesModule({ session }) {
             user_id: session.user_id,
             role: 'owner',
           }),
-    }).catch(err => console.error('Failed to send message:', err));
+    }).catch(err => console.error('Failed to add member to conversation:', err));
         setNewName('');
         setShowCreate(false);
         const convRes = await fetch('/api/data/conversations', { headers: getAuthHeaders() });

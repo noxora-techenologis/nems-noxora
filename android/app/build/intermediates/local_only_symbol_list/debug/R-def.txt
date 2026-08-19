@@ -21,3 +21,4 @@ string loading
 string no_internet
 string retry
 style Theme.NEMS
+xml network_security_config

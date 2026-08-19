@@ -4,7 +4,7 @@
             "outputFile": "com.noxora.nems.app-mergeDebugResources-30:/values-watch-v21/values-watch-v21.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\PC\\.gradle\\caches\\9.3.0\\transforms\\897c2a2eba60ac3edf5c2a722fdbf1a3\\workspace\\transformed\\appcompat-1.6.1\\res\\values-watch-v21\\values-watch-v21.xml",
+                    "source": "C:\\Users\\PC\\.gradle\\caches\\transforms-3\\1269e761ba2b2764df14d796e474c793\\transformed\\appcompat-1.6.1\\res\\values-watch-v21\\values-watch-v21.xml",
                     "from": {
                         "startLines": "2,6,10",
                         "startColumns": "4,4,4",

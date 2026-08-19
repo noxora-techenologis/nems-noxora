@@ -4,7 +4,7 @@
             "outputFile": "com.noxora.nems.app-mergeDebugResources-30:/values-v23/values-v23.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\PC\\.gradle\\caches\\9.3.0\\transforms\\7c4d6fba944c1a1451347eaed1469332\\workspace\\transformed\\material-1.11.0\\res\\values-v23\\values-v23.xml",
+                    "source": "C:\\Users\\PC\\.gradle\\caches\\transforms-3\\2b09c2cd4192fe4b7b686a651ae8eff3\\transformed\\material-1.11.0\\res\\values-v23\\values-v23.xml",
                     "from": {
                         "startLines": "2,5,9,13,16,19,22,25,28,32",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4",
@@ -23,7 +23,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\PC\\.gradle\\caches\\9.3.0\\transforms\\897c2a2eba60ac3edf5c2a722fdbf1a3\\workspace\\transformed\\appcompat-1.6.1\\res\\values-v23\\values-v23.xml",
+                    "source": "C:\\Users\\PC\\.gradle\\caches\\transforms-3\\1269e761ba2b2764df14d796e474c793\\transformed\\appcompat-1.6.1\\res\\values-v23\\values-v23.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,20,34,35,36,39,43,44,45,46",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -34,7 +34,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\PC\\.gradle\\caches\\9.3.0\\transforms\\0a3189380e1ca8787746e8e6776fa913\\workspace\\transformed\\cardview-1.0.0\\res\\values-v23\\values-v23.xml",
+                    "source": "C:\\Users\\PC\\.gradle\\caches\\transforms-3\\47ab4dae8f4577a0d35e59cd24d21777\\transformed\\cardview-1.0.0\\res\\values-v23\\values-v23.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
