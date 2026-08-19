@@ -73,7 +73,7 @@ export async function GET(request) {
       }
 
       const hourlyRateForAbsence = salaryType === 'hourly'
-        ? hourlyRate
+        ? 0
         : basicSalary / (WORK_DAYS_PER_MONTH * WORK_HOURS_PER_DAY);
 
       const attendanceDeductions = totalAbsentHours * hourlyRateForAbsence;
