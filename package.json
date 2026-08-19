@@ -12,6 +12,7 @@
     "@capacitor/android": "^8.4.2",
     "@capacitor/cli": "^8.4.2",
     "@capacitor/core": "^8.4.2",
+    "bcryptjs": "^3.0.3",
     "next": "16.2.10",
     "pg": "^8.22.0",
     "react": "19.2.4",
