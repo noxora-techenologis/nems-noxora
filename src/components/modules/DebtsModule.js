@@ -81,7 +81,8 @@ export default function DebtsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -118,7 +119,8 @@ export default function DebtsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية السداد');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -139,7 +141,8 @@ export default function DebtsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الحذف');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };

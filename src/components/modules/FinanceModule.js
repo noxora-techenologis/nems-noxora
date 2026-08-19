@@ -100,7 +100,7 @@ export default function FinanceModule({ session }) {
       const result = await res.json();
       if (result.success) {
         // Auto-update company valuation
-        fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
+        fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() }).catch(err => console.error('Valuation refresh failed:', err));
         alert('تمت إضافة الإيراد بنجاح!');
         setRevTitle('');
         setRevAmount('');
@@ -108,7 +108,8 @@ export default function FinanceModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -140,7 +141,7 @@ export default function FinanceModule({ session }) {
       const result = await res.json();
       if (result.success) {
         // Auto-update company valuation
-        fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() }).catch(() => {});
+        fetch('/api/valuation', { method: 'POST', headers: getAuthHeaders() }).catch(err => console.error('Valuation refresh failed:', err));
         alert('تمت إضافة المصروف بنجاح!');
         setExpTitle('');
         setExpAmount('');
@@ -149,7 +150,8 @@ export default function FinanceModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -180,7 +182,8 @@ export default function FinanceModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -216,7 +219,8 @@ export default function FinanceModule({ session }) {
       } else {
         alert(result.error || 'فشلت إضافة المقترح');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };

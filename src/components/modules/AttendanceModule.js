@@ -161,7 +161,8 @@ export default function AttendanceModule({ session }) {
         } else {
           alert(result.error || 'فشلت البصمة');
         }
-      } catch {
+      } catch (err) {
+        console.error(err);
         alert('تعذر الاتصال بالخادم');
       } finally {
         setCheckingIn(false);
@@ -213,7 +214,8 @@ export default function AttendanceModule({ session }) {
       } else {
         alert(result.error || 'فشل تقديم الطلب');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -239,7 +241,8 @@ export default function AttendanceModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -270,7 +273,8 @@ export default function AttendanceModule({ session }) {
         } else {
           alert(result.error || 'فشل تسجيل الانصراف');
         }
-      } catch {
+      } catch (err) {
+        console.error(err);
         alert('تعذر الاتصال بالخادم');
       } finally {
         setCheckingIn(false);

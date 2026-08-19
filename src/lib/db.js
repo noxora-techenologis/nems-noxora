@@ -157,7 +157,9 @@ export async function insertRecord(table, record, userId = 1) {
   );
   const inserted = res.rows[0];
 
-  auditLog(userId, 'create', MODULE_MAP[table] || 'System', table, inserted[pk(table)] || 'N/A', null, inserted).catch(() => {});
+  auditLog(userId, 'create', MODULE_MAP[table] || 'System', table, inserted[pk(table)] || 'N/A', null, inserted).catch(err => {
+    console.error('Audit log failed (create):', err?.message);
+  });
 
   return inserted;
 }
@@ -185,7 +187,9 @@ export async function updateRecord(table, idValue, updatedFields, userId = 1) {
   if (res.rowCount === 0) return false;
 
   const newRecord = res.rows[0];
-  auditLog(userId, 'update', MODULE_MAP[table] || 'System', table, idValue, null, newRecord).catch(() => {});
+  auditLog(userId, 'update', MODULE_MAP[table] || 'System', table, idValue, null, newRecord).catch(err => {
+    console.error('Audit log failed (update):', err?.message);
+  });
 
   return newRecord;
 }
@@ -203,7 +207,9 @@ export async function deleteRecord(table, idValue, userId = 1) {
 
   if (res.rowCount === 0) return false;
 
-  auditLog(userId, 'delete', MODULE_MAP[table] || 'System', table, idValue, res.rows[0], null).catch(() => {});
+  auditLog(userId, 'delete', MODULE_MAP[table] || 'System', table, idValue, res.rows[0], null).catch(err => {
+    console.error('Audit log failed (delete):', err?.message);
+  });
 
   return true;
 }
@@ -230,7 +236,8 @@ export async function auditLog(userId, action, module, entityType, entityId, old
         '127.0.0.1', '💻 Server API', now()
       ]
     );
-  } catch {
+  } catch (err) {
     // Audit log must never break the main operation
+    console.error(err);
   }
 }

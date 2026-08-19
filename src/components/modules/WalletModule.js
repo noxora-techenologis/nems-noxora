@@ -44,6 +44,7 @@ export default function WalletModule({ session }) {
 
   // Withdraw form
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [topupNotes, setTopupNotes] = useState('');
   const [withdrawNotes, setWithdrawNotes] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState('');
   const [withdrawAccount, setWithdrawAccount] = useState('');
@@ -196,11 +197,13 @@ export default function WalletModule({ session }) {
         setScreenshotPreview('');
         setScreenshotFile(null);
         setBankilyTxnId('');
+        setTopupNotes('');
         fetchWallet();
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setSubmitting(false);
@@ -239,7 +242,8 @@ export default function WalletModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setSubmitting(false);
@@ -256,7 +260,8 @@ export default function WalletModule({ session }) {
       const result = await res.json();
       if (result.success) { alert(result.message); fetchAdmin(); }
       else { alert(result.error || 'فشلت العملية'); }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -519,8 +524,8 @@ export default function WalletModule({ session }) {
                 <input
                   type="text"
                   className="form-input"
-                  value={withdrawNotes}
-                  onChange={e => {}}
+                  value={topupNotes}
+                  onChange={e => setTopupNotes(e.target.value)}
                   placeholder="أي ملاحظات إضافية..."
                   style={{ fontSize: '13px' }}
                 />

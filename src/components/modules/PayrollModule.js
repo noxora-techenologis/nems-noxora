@@ -58,7 +58,8 @@ export default function PayrollModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setGenerating(false);
@@ -99,7 +100,8 @@ export default function PayrollModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setConfirming(false);

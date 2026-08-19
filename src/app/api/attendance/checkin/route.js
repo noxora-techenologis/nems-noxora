@@ -46,7 +46,7 @@ export async function POST(request) {
     let todayRecord;
     if (attInsert.length > 0) {
       todayRecord = attInsert[0];
-      auditLog(userId, 'create', 'Attendance', 'attendance', todayRecord.attendance_id, null, todayRecord).catch(() => {});
+      auditLog(userId, 'create', 'Attendance', 'attendance', todayRecord.attendance_id, null, todayRecord).catch(err => console.error('Audit log failed:', err));
     } else {
       const existing = await query(
         `SELECT * FROM "attendance" WHERE "employee_id" = $1 AND "date" = $2`,
@@ -85,7 +85,7 @@ export async function POST(request) {
       return NextResponse.json({ error: `البصمة ${currentSlot} تم تسجيلها بالفعل.` }, { status: 409 });
     }
 
-    auditLog(userId, 'checkin', 'Attendance', 'attendance_logs', logResult[0].log_id, null, logResult[0]).catch(() => {});
+    auditLog(userId, 'checkin', 'Attendance', 'attendance_logs', logResult[0].log_id, null, logResult[0]).catch(err => console.error('Audit log failed:', err));
 
     const updatedLogsCount = existingLogCount + 1;
     const totalHours = updatedLogsCount;

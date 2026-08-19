@@ -76,7 +76,8 @@ export default function MessagesModule({ session }) {
       const msgData = await msgRes.json();
       applyConversationData(convData.data || [], msgData.data || [], null);
       if (activeConv) markRead(activeConv);
-    } catch {
+    } catch (err) {
+      console.error(err);
       // silent background refresh — ignore transient errors
     }
   };
@@ -87,7 +88,7 @@ export default function MessagesModule({ session }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ conversation_id: conv.conversation_id }),
-    }).catch(() => {});
+        }).catch(err => console.error('Failed to create conversation:', err));
   };
 
   const openConversation = (c) => {
@@ -126,7 +127,8 @@ export default function MessagesModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإرسال');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setSending(false);
@@ -158,7 +160,7 @@ export default function MessagesModule({ session }) {
             user_id: session.user_id,
             role: 'owner',
           }),
-        }).catch(() => {});
+    }).catch(err => console.error('Failed to send message:', err));
         setNewName('');
         setShowCreate(false);
         const convRes = await fetch('/api/data/conversations', { headers: getAuthHeaders() });
@@ -169,7 +171,8 @@ export default function MessagesModule({ session }) {
       } else {
         alert(result.error || 'فشل إنشاء القناة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setCreating(false);

@@ -16,8 +16,11 @@ export async function GET(request) {
       getTable('shares'),
     ]);
 
-    const v = valuationRows[0] || {};
-    const capital = Number(v.capital) || 25000;
+    const v = valuationRows[0];
+    if (!v || !v.valuation_id) {
+      return NextResponse.json({ error: 'لا توجد سجلات تقييم للشركة.' }, { status: 404 });
+    }
+    const capital = Number(v.capital) || 0;
     const retainedEarnings = Number(v.retained_earnings) || 0;
     const distributedProfit = Number(v.distributed_profit) || 0;
 
@@ -70,9 +73,12 @@ export async function POST(request) {
       getTable('profit_distributions'),
     ]);
 
-    const v = valuationRows[0] || {};
+    const v = valuationRows[0];
+    if (!v || !v.valuation_id) {
+      return NextResponse.json({ error: 'لا توجد سجلات تقييم للشركة. يرجى إنشاء سجل تقييم أولاً.' }, { status: 404 });
+    }
     const valuationId = v.valuation_id;
-    const capital = Number(v.capital) || 25000;
+    const capital = Number(v.capital) || 0;
     const retainedEarnings = Number(v.retained_earnings) || 0;
     const distributedProfit = Number(v.distributed_profit) || 0;
 

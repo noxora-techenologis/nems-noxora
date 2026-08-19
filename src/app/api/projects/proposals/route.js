@@ -70,10 +70,11 @@ export async function POST(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { action, projectId, userId, title, description, proposalId, choice, investmentId, weight } = body;
+    const { action, projectId, title, description, proposalId, choice, investmentId, weight } = body;
+    const userId = user.user_id;
 
     if (action === 'create') {
-      if (!projectId || !userId || !title) {
+      if (!projectId || !title) {
         return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 });
       }
 
@@ -99,7 +100,7 @@ export async function POST(request) {
     }
 
     if (action === 'vote') {
-      if (!proposalId || !userId || !choice) {
+      if (!proposalId || !choice) {
         return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 });
       }
 

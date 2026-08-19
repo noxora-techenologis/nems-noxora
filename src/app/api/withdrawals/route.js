@@ -37,9 +37,16 @@ export async function POST(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { owner_id, amount, payment_method, notes, _userId } = body;
+    const { amount, payment_method, notes } = body;
 
-    if (!owner_id || !amount || Number(amount) <= 0) {
+    const owners = await getTable('owners');
+    const ownerRecord = owners.find(o => o.user_id === user.user_id);
+    if (!ownerRecord) {
+      return NextResponse.json({ error: 'لا يوجد سجل مالك لهذا المستخدم' }, { status: 400 });
+    }
+    const owner_id = ownerRecord.owner_id;
+
+    if (!amount || Number(amount) <= 0) {
       return NextResponse.json({ error: 'بيانات غير صحيحة' }, { status: 400 });
     }
 
@@ -69,7 +76,7 @@ export async function POST(request) {
        ("owner_id", "amount", "status", "payment_method", "notes", "created_by", "created_at", "updated_at")
        VALUES ($1, $2, 'PENDING', $3, $4, $5, NOW(), NOW())
        RETURNING *`,
-      [owner_id, Number(amount), payment_method || 'تحويل بنكي', notes || '', _userId || owner_id]
+      [owner_id, Number(amount), payment_method || 'تحويل بنكي', notes || '', user.user_id]
     );
 
     return NextResponse.json({ success: true, data: result.rows[0] }, { status: 201 });
@@ -85,7 +92,7 @@ export async function PUT(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { _id, status, role, user_id, payment_method, notes } = body;
+    const { _id, status, payment_method, notes } = body;
 
     if (!_id || !status) {
       return NextResponse.json({ error: 'بيانات مطلوبة مفقودة' }, { status: 400 });
@@ -102,7 +109,8 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
     }
 
-    const roleLower = (role || '').toLowerCase();
+    const roleLower = (user.role_name || '').toLowerCase();
+    const user_id = user.user_id;
 
     // Permission checks per state transition
     if (status === 'FINANCIALLY_VERIFIED') {
@@ -201,7 +209,7 @@ export async function DELETE(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { _id, role, user_id } = body;
+    const { _id } = body;
 
     const existing = await getTable('withdrawal_requests');
     const req = existing.find(r => r.request_id === Number(_id));
@@ -209,7 +217,7 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });
     }
 
-    const roleLower = (role || '').toLowerCase();
+    const roleLower = (user.role_name || '').toLowerCase();
 
     if (roleLower === 'owner' && req.status !== 'PENDING') {
       return NextResponse.json({ error: 'المالك لا يمكنه إلغاء طلب بعد المراجعة' }, { status: 403 });
@@ -233,7 +241,7 @@ export async function DELETE(request) {
           await query(`UPDATE "profit_distributions" SET "payment_status" = 'pending', "updated_at" = NOW() WHERE "distribution_id" = $1`, [dist.distribution_id]);
           remaining -= distAmount;
         } else {
-          await query(`UPDATE "profit_distributions" SET "amount" = $1, "payment_status" = 'pending', "updated_at" = NOW() WHERE "distribution_id" = $2`, [distAmount + remaining, dist.distribution_id]);
+          await query(`UPDATE "profit_distributions" SET "amount" = $1, "payment_status" = 'pending', "updated_at" = NOW() WHERE "distribution_id" = $2`, [distAmount - remaining, dist.distribution_id]);
           remaining = 0;
         }
       }

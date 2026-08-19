@@ -31,7 +31,7 @@ export default function AdminDashboard() {
         shares: shr.data || [],
       });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => { console.error('Admin dashboard fetch error:', err); setLoading(false); });
   }, []);
 
   if (loading) return (

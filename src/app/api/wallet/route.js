@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTable, insertRecord } from '@/lib/db';
+import { getTable, insertRecord, query } from '@/lib/db';
 import { calcWithdrawalFee, roundMRU } from '@/lib/fees';
 import { verifySession, requireRole } from '@/lib/serverAuth';
 
@@ -142,15 +142,19 @@ async function handleWithdraw(userId, amount, paymentMethod, accountDetails, not
   // Calculate withdrawal fee
   const feeInfo = calcWithdrawalFee(amount);
 
-  if (Number(wallet.balance) < amount) {
+  // Atomic balance check + deduction to prevent race conditions
+  const deductResult = await query(
+    `UPDATE wallets SET balance = balance - $1, updated_at = NOW()
+     WHERE wallet_id = $2 AND balance >= $1 RETURNING *`,
+    [amount, wallet.wallet_id]
+  );
+  if (deductResult.length === 0) {
     return NextResponse.json({ error: `الرصيد غير كافٍ. المتاح: ${wallet.balance} MRU | المطلوب: ${amount} MRU + عمولة ${feeInfo.fee} MRU = ${feeInfo.netAmount + feeInfo.fee} MRU` }, { status: 400 });
   }
 
-  const newBalance = roundMRU(Number(wallet.balance) - amount);
-
+  const newBalance = roundMRU(Number(deductResult[0].balance));
   const { updateRecord } = await import('@/lib/db');
   await updateRecord('wallets', wallet.wallet_id, {
-    balance: newBalance,
     total_withdrawn: roundMRU(Number(wallet.total_withdrawn || 0) + amount),
   }, userId);
 

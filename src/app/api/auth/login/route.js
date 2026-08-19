@@ -1,5 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getTable } from '@/lib/db';
+import bcrypt from 'bcryptjs';
+
+// Simple in-memory rate limiter: max 10 attempts per email per 15 minutes
+const loginAttempts = new Map();
+const RATE_WINDOW = 15 * 60 * 1000;
+const MAX_ATTEMPTS = 10;
+
+// Prune expired entries every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of loginAttempts) {
+    if (now - record.start > RATE_WINDOW) loginAttempts.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
+function checkRateLimit(email) {
+  const key = email.toLowerCase().trim();
+  const now = Date.now();
+  const record = loginAttempts.get(key);
+  if (!record || now - record.start > RATE_WINDOW) {
+    loginAttempts.set(key, { start: now, count: 1 });
+    return true;
+  }
+  record.count++;
+  if (record.count > MAX_ATTEMPTS) return false;
+  return true;
+}
 
 export async function POST(request) {
   try {
@@ -12,19 +39,35 @@ export async function POST(request) {
       );
     }
 
+    // Rate limit check
+    if (!checkRateLimit(email)) {
+      return NextResponse.json(
+        { error: 'تم تجاوز عدد المحاولات المسموح. حاول مرة أخرى بعد 15 دقيقة.' },
+        { status: 429 }
+      );
+    }
+
     // Look up user by email
     const users = await getTable('users');
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
 
     if (!user) {
       return NextResponse.json(
-        { error: 'البريد الإلكتروني غير موجود في النظام.' },
+        { error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' },
         { status: 401 }
       );
     }
 
-    // Check password (plain text in dev / hash in prod)
-    if (user.password_hash !== password) {
+    // Check password: bcrypt only — all passwords must be hashed
+    if (!user.password_hash?.startsWith('$2')) {
+      console.error(`User ${user.email} has unhashed password — rejected`);
+      return NextResponse.json(
+        { error: 'حدث خطأ في النظام. تواصل مع المدير.' },
+        { status: 500 }
+      );
+    }
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
       return NextResponse.json(
         { error: 'كلمة المرور غير صحيحة.' },
         { status: 401 }
@@ -73,7 +116,7 @@ export async function POST(request) {
       await updateRecord('users', user.user_id, {
         last_login: new Date().toISOString().replace('T', ' ').substring(0, 19)
       }, user.user_id);
-    } catch { /* ignore last_login update errors */ }
+    } catch (err) { console.error('Failed to update last_login:', err); }
 
     // Return session payload (never return password)
     const { password_hash, ...safeUser } = user;

@@ -51,7 +51,8 @@ export default function SettingsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الحفظ');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setSavingProfile(false);
@@ -93,7 +94,8 @@ export default function SettingsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية التعديل');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };

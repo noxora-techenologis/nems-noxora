@@ -42,7 +42,10 @@ export default function ReportsModule({ session }) {
       setExpenses(exp.data || []);
       setSalaries(sal.data || []);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => {
+      console.error('Reports fetch error:', err);
+      setLoading(false);
+    });
   }, []);
 
   const fetchPayroll = async () => {
@@ -75,7 +78,8 @@ export default function ReportsModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setGenerating(false);

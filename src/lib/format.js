@@ -39,11 +39,13 @@ export function setPreferredCurrency(currency) {
   }
 }
 
+const EXCHANGE_RATE = 39; // MRU per USD — update when rate changes
+
 export function convertCurrency(amount, from = 'MRU', to = 'MRU') {
   if (amount === undefined || amount === null || isNaN(amount)) return 0;
   if (from === to) return amount;
-  if (from === 'USD' && to === 'MRU') return amount * 39;
-  if (from === 'MRU' && to === 'USD') return amount / 39;
+  if (from === 'USD' && to === 'MRU') return amount * EXCHANGE_RATE;
+  if (from === 'MRU' && to === 'USD') return amount / EXCHANGE_RATE;
   return amount;
 }
 
@@ -70,7 +72,8 @@ export function formatDate(dateInput, options = {}) {
     // Use 'en-GB' for dd/mm/yyyy style, or pass options for custom formats
     const formatted = d.toLocaleDateString('en-GB', defaultOpts);
     return toGhubariya(formatted);
-  } catch {
+  } catch (err) {
+    console.error('Date formatting failed:', err);
     return toGhubariya(String(dateInput));
   }
 }
@@ -84,7 +87,8 @@ export function formatDateArabic(dateInput, options = {}) {
     const formatted = d.toLocaleDateString('ar-SA', defaultOpts);
     // Replace Eastern Arabic digits with Ghubariya
     return toGhubariya(formatted);
-  } catch {
+  } catch (err) {
+    console.error('Arabic date formatting failed:', err);
     return toGhubariya(String(dateInput));
   }
 }

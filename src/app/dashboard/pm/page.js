@@ -18,7 +18,7 @@ export default function PMDashboard() {
     ]).then(([prjs, tsks, mts]) => {
       setData({ projects: prjs.data || [], tasks: tsks.data || [], meetings: mts.data || [] });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => { console.error('PM dashboard fetch error:', err); setLoading(false); });
   }, []);
 
   if (loading) return (

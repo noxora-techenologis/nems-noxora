@@ -58,7 +58,8 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
           } else {
             alert(result.error || 'فشل رفع الصورة');
           }
-        } catch {
+        } catch (err) {
+          console.error('Avatar upload failed:', err);
           alert('تعذر رفع الصورة');
         }
       };
@@ -85,8 +86,26 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       const result = await res.json();
       if (result.success) {
         if (isSelf) {
-          const updatedSession = { ...currentUser, name, phone, email, avatar };
-          localStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
+          // Re-fetch full session from login to ensure all fields are up-to-date
+          try {
+            const sessRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: email, _refresh: true, _userId: user.user_id }),
+            });
+            const sessData = await sessRes.json();
+            if (sessData.success && sessData.user) {
+              localStorage.setItem(SESSION_KEY, JSON.stringify(sessData.user));
+            } else {
+              // Fallback: update locally
+              const updatedSession = { ...currentUser, name, phone, email, avatar };
+              localStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
+            }
+          } catch (err) {
+            console.error('Session re-fetch failed:', err);
+            const updatedSession = { ...currentUser, name, phone, email, avatar };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
+          }
           window.dispatchEvent(new Event('profile-change'));
         }
         alert('تم تحديث بيانات الملف الشخصي بنجاح!');
@@ -95,7 +114,8 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       } else {
         alert(result.error || 'فشلت عملية حفظ التعديلات');
       }
-    } catch {
+    } catch (err) {
+      console.error('Profile save failed:', err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setSaving(false);
@@ -139,7 +159,8 @@ export default function UserProfileModal({ user, currentUser, onClose, onUpdate 
       } else {
         setPwdError(result.error || 'فشل تغيير كلمة المرور');
       }
-    } catch {
+    } catch (err) {
+      console.error('Password change failed:', err);
       setPwdError('تعذر الاتصال بالخادم');
     } finally {
       setPwdSaving(false);

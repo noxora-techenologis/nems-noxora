@@ -11,6 +11,15 @@ const ALLOWED_FIELDS = {
 // Roles allowed to edit other users' records
 const USER_EDIT_ROLES = ['admin', 'ceo', 'hr'];
 
+// Role-based table access restrictions — sensitive tables require privileged roles
+const TABLE_ROLES = {
+  users: ['admin', 'ceo', 'hr'],
+  audit_log: ['admin', 'ceo'],
+  system_settings: ['admin'],
+  role_permissions: ['admin'],
+  permissions: ['admin'],
+};
+
 export async function GET(request, { params }) {
   try {
     const { user, error: authError } = await verifySession(request);
@@ -20,6 +29,15 @@ export async function GET(request, { params }) {
 
     if (!SAFE_TABLES.has(table)) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح بالوصول إليه.` }, { status: 403 });
+    }
+
+    // Check role-based access for sensitive tables
+    const requiredRoles = TABLE_ROLES[table];
+    if (requiredRoles) {
+      const userRole = (user.role_name || '').toLowerCase();
+      if (!requiredRoles.includes(userRole)) {
+        return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
+      }
     }
 
     const data = await getTable(table);
@@ -58,6 +76,15 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح به.` }, { status: 403 });
     }
 
+    // Check role-based access for sensitive tables
+    const requiredRoles = TABLE_ROLES[table];
+    if (requiredRoles) {
+      const userRole = (user.role_name || '').toLowerCase();
+      if (!requiredRoles.includes(userRole)) {
+        return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
+      }
+    }
+
     const body = await request.json();
     const { _userId, ...record } = body;
 
@@ -76,9 +103,7 @@ export async function POST(request, { params }) {
     // Users: hash password + email uniqueness
     if (table === 'users') {
       if (record.password_hash) {
-        if (!String(record.password_hash).startsWith('$2')) {
-          record.password_hash = await bcrypt.hash(String(record.password_hash), 10);
-        }
+        record.password_hash = await bcrypt.hash(String(record.password_hash), 10);
       }
       if (record.email) {
         const allUsers = await getTable('users');
@@ -151,7 +176,14 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: true, data: updated });
     }
 
-    const updated = await updateRecord(table, _id, fields, user.user_id);
+    // Non-users tables: block sensitive fields from being updated
+    const BLOCKED_FIELDS = new Set(['password_hash', 'created_at', 'role_id', 'status']);
+    const sanitizedFields = {};
+    for (const key of Object.keys(fields)) {
+      if (!BLOCKED_FIELDS.has(key)) sanitizedFields[key] = fields[key];
+    }
+
+    const updated = await updateRecord(table, _id, sanitizedFields, user.user_id);
     if (!updated) {
       return NextResponse.json({ error: 'السجل غير موجود' }, { status: 404 });
     }
@@ -172,6 +204,15 @@ export async function DELETE(request, { params }) {
 
     if (!SAFE_TABLES.has(table)) {
       return NextResponse.json({ error: `الجدول "${table}" غير مسموح به.` }, { status: 403 });
+    }
+
+    // Check role-based access for sensitive tables
+    const requiredRoles = TABLE_ROLES[table];
+    if (requiredRoles) {
+      const userRole = (user.role_name || '').toLowerCase();
+      if (!requiredRoles.includes(userRole)) {
+        return NextResponse.json({ error: 'لا تملك صلاحية الوصول لهذا الجدول.' }, { status: 403 });
+      }
     }
 
     const { searchParams } = new URL(request.url);

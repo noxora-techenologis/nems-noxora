@@ -34,7 +34,7 @@ export default function OwnerDashboard() {
         transactions: trans.data || [],
       });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => { console.error('Owner dashboard fetch error:', err); setLoading(false); });
   }, []);
 
   if (loading) return (

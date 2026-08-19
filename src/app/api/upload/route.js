@@ -15,7 +15,7 @@ export async function POST(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { file, filename } = body;
+    const { file } = body;
 
     if (!file) {
       return NextResponse.json({ error: 'لا يوجد ملف' }, { status: 400 });
@@ -29,9 +29,14 @@ export async function POST(request) {
 
     const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
     const base64Data = matches[2];
+
+    if (base64Data.length > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'حجم الملف يتجاوز الحد الأقصى (5 ميجا)' }, { status: 413 });
+    }
+
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Generate filename
+    // Generate filename — always server-generated to prevent path traversal
     const now = new Date();
     const ts = now.getFullYear().toString() +
       (now.getMonth() + 1).toString().padStart(2, '0') +
@@ -40,7 +45,7 @@ export async function POST(request) {
       now.getMinutes().toString().padStart(2, '0') +
       now.getSeconds().toString().padStart(2, '0');
     const rand = Math.random().toString(36).substring(2, 8);
-    const finalName = filename || `topup_${ts}_${rand}.${ext}`;
+    const finalName = `topup_${ts}_${rand}.${ext}`;
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     if (!existsSync(uploadDir)) {

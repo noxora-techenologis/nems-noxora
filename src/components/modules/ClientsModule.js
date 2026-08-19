@@ -107,7 +107,8 @@ export default function ClientsModule({ session }) {
       } else {
         alert(result.error || 'فشلت إضافة العميل');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -150,7 +151,8 @@ export default function ClientsModule({ session }) {
       } else {
         alert(result.error || 'فشل تحديث سجل التواصل');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };

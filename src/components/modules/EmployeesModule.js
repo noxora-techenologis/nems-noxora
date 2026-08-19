@@ -154,7 +154,8 @@ export default function EmployeesModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الحفظ');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setSaving(false);

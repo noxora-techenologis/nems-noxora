@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getTable, insertRecord, updateRecord, query } from '@/lib/db';
-import { verifySession } from '@/lib/serverAuth';
+import { verifySession, requireRole } from '@/lib/serverAuth';
 import { sameMonth, dateKey } from '@/lib/dates';
 
 const WORK_HOURS_PER_DAY = 8;
@@ -13,7 +13,8 @@ export async function GET(request) {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
 
-    const { searchParams } = new URL(request.url);
+    const roleErr = await requireRole(user, ['ceo', 'admin', 'hr', 'fm']);
+    if (roleErr) return roleErr; = new URL(request.url);
     const month = searchParams.get('month') || new Date().toISOString().substring(0, 7);
     const employeeId = searchParams.get('employeeId');
 
@@ -133,6 +134,9 @@ export async function POST(request) {
   try {
     const { user, error: authError } = await verifySession(request);
     if (authError) return authError;
+
+    const roleErr = await requireRole(user, ['ceo', 'admin', 'fm']);
+    if (roleErr) return roleErr;
 
     const body = await request.json();
     const { month, employee_ids, _userId } = body;

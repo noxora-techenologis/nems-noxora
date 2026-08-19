@@ -48,9 +48,10 @@ export async function POST(request) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { projectId, userId, amount, owner_id, employee_id } = body;
+    const { projectId, amount, owner_id, employee_id } = body;
+    const userId = user.user_id;
 
-    if (!projectId || !userId || !amount || Number(amount) <= 0) {
+    if (!projectId || !amount || Number(amount) <= 0) {
       return NextResponse.json({ error: 'بيانات غير صالحة' }, { status: 400 });
     }
 

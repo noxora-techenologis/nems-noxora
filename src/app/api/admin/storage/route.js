@@ -60,8 +60,9 @@ export async function GET(request) {
         WHERE datname = current_database() AND state = 'active'
       `);
       activeConnections = Number(connRows[0]?.active_connections) || 0;
-    } catch {
+    } catch (err) {
       // pg_stat_activity may not be accessible — ignore
+      console.error(err);
     }
 
     return NextResponse.json({

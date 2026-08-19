@@ -19,6 +19,10 @@ export async function GET(request) {
 
     const owner = owners.find(o => o.owner_id === Number(ownerId));
 
+    if (!owner) {
+      return NextResponse.json({ error: 'سجل المالك غير موجود' }, { status: 404 });
+    }
+
     // Only the owner themself (or privileged roles) can view their roles
     const roles = await getTable('roles');
     const role = roles.find(r => r.role_id === user.role_id);

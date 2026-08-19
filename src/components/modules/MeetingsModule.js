@@ -97,7 +97,8 @@ export default function MeetingsModule({ session }) {
       } else {
         alert(result.error || 'فشلت جدولة الاجتماع');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -124,7 +125,8 @@ export default function MeetingsModule({ session }) {
       } else {
         alert(result.error || 'فشل الحفظ');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };

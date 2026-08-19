@@ -36,7 +36,7 @@ export default function CEODashboard() {
     fetch('/api/dashboard/ceo', { headers: getAuthHeaders() })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(err => { console.error('CEO dashboard fetch error:', err); setLoading(false); });
   }, []);
 
   if (loading) return (

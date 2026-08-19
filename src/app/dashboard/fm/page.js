@@ -34,7 +34,10 @@ export default function FMDashboard() {
         deductions: deds.data || [],
       });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => {
+      console.error('FM Dashboard fetch error:', err);
+      setLoading(false);
+    });
   }, []);
 
   if (loading) return (

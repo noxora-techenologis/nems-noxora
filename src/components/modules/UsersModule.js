@@ -138,7 +138,7 @@ export default function UsersModule({ session }) {
                 }),
               });
             }
-          } catch { /* ignore owner creation errors */ }
+          } catch (err) { console.error(err); /* ignore owner creation errors */ }
           alert('تم إنشاء حساب المالك بنجاح! يمكنه الآن تسجيل الدخول والدخول إلى لوحة الملاك.');
         } else {
           // Auto-create employee record for non-owner roles
@@ -160,7 +160,7 @@ export default function UsersModule({ session }) {
             });
             const empResult = await empRes.json();
             empCreated = empResult.success;
-          } catch { /* ignore */ }
+          } catch (err) { console.error(err); /* ignore */ }
           alert(empCreated
             ? 'تم إنشاء حساب المستخدم وإضافته كموظف تلقائياً!'
             : 'تم إنشاء حساب المستخدم بنجاح. يمكنك إضافة بيانات الموظف يدوياً من وحدة الموظفين.');
@@ -174,7 +174,8 @@ export default function UsersModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -202,7 +203,8 @@ export default function UsersModule({ session }) {
       } else {
         alert(result.error || 'فشل تبديل حالة الحساب');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };

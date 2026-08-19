@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { updateRecord, getTable } from '@/lib/db';
 import { verifySession, requireRole } from '@/lib/serverAuth';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request) {
   try {
@@ -25,21 +26,26 @@ export async function POST(request) {
     }
 
     const isSelf = user.user_id === Number(userId);
-    const roleErr = await requireRole(user, ['admin']);
-    const isAdmin = !roleErr;
+    const roleErr = await requireRole(user, ['admin', 'ceo', 'hr']);
+    const isPrivileged = !roleErr;
 
     if (isSelf) {
       if (!currentPassword) {
         return NextResponse.json({ success: false, error: 'يرجى إدخال كلمة المرور الحالية' }, { status: 400 });
       }
-      if (targetUser.password_hash !== currentPassword) {
+      if (!targetUser.password_hash?.startsWith('$2')) {
+        return NextResponse.json({ success: false, error: 'خطأ في النظام: كلمة المرور غير مشفرة' }, { status: 500 });
+      }
+      const match = await bcrypt.compare(currentPassword, targetUser.password_hash);
+      if (!match) {
         return NextResponse.json({ success: false, error: 'كلمة المرور الحالية غير صحيحة' }, { status: 401 });
       }
-    } else if (!isAdmin) {
+    } else if (!isPrivileged) {
       return NextResponse.json({ success: false, error: 'لا تملك صلاحية تغيير كلمة مرور مستخدم آخر' }, { status: 403 });
     }
 
-    await updateRecord('users', userId, { password_hash: newPassword }, user.user_id);
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await updateRecord('users', userId, { password_hash: hashed }, user.user_id);
 
     return NextResponse.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' });
   } catch (err) {

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { formatCurrency as formatCurrencyImport, formatNumber } from '@/lib/format';
 import CandlestickChart from '@/components/CandlestickChart';
 import { getSession, getAuthHeaders } from '@/lib/auth';
+import UserProfileModal from '@/components/UserProfileModal';
 
 const COLORS = ['#C0392B', '#F39C12', '#3498DB', '#9B59B6', '#1ABC9C'];
 
@@ -52,6 +53,8 @@ export default function OwnersModule({ session }) {
   const [withdrawMethod, setWithdrawMethod] = useState('تحويل بنكي');
   const [withdrawNotes, setWithdrawNotes] = useState('');
   const [selectedWithdrawal, setSelectedWithdrawal] = useState(null);
+  const [selectedOwner, setSelectedOwner] = useState(null);
+  const [showOwnerProfile, setShowOwnerProfile] = useState(false);
 
   const isOwner = session.role_name.toLowerCase() === 'owner' || session.role_name.toLowerCase() === 'ceo';
   const isCEO = session.role_name.toLowerCase() === 'ceo';
@@ -144,7 +147,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإرسال');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -170,7 +174,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -191,7 +196,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -324,7 +330,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(voteResult.error || 'فشلت عملية التصويت');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -373,7 +380,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشل تقديم الطلب');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -395,7 +403,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -431,7 +440,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشل تقديم الطلب');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -457,7 +467,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -466,13 +477,20 @@ export default function OwnersModule({ session }) {
     const pos = allPositions.find(p => p.code === positionCode);
     if (!confirm(`هل أنت متأكد من التنازل عن منصب "${pos?.name || positionCode}"؟\nستفقد جميع الصلاحيات المرتبطة بهذا المنصب.`)) return;
 
+    // Use verified owner record from DB, not session data
+    const currentOwner = owners.find(o => o.user_id === session.user_id);
+    if (!currentOwner) {
+      alert('لم يُعثر على سجل ملكيتك.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/owner-roles', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           action: 'demote',
-          owner_id: session.owner_id,
+          owner_id: currentOwner.owner_id,
           position_code: positionCode,
         })
       });
@@ -483,7 +501,8 @@ export default function OwnersModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -527,8 +546,8 @@ export default function OwnersModule({ session }) {
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
-  const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
-  const capital = valuation ? Number(valuation.capital) || 25000 : 25000;
+  const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0) || 0;
+  const capital = valuation ? Number(valuation.capital) || 0 : 0;
   const retainedEarnings = valuation ? Number(valuation.retained_earnings) || 0 : 0;
   const companyValue = capital + retainedEarnings;
   const shareValue = totalShares > 0 ? companyValue / totalShares : 0;
@@ -689,7 +708,16 @@ export default function OwnersModule({ session }) {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '15px' }}>{owner?.name || `مساهم ${sh.owner_id}`}</div>
+                      <div
+                        style={{ fontWeight: 800, fontSize: '15px', cursor: owner?.user_id ? 'pointer' : 'default', textDecoration: owner?.user_id ? 'underline' : 'none' }}
+                        onClick={() => {
+                          if (owner?.user_id) {
+                            setSelectedOwner({ ...owner, role_name: 'Owner' });
+                            setShowOwnerProfile(true);
+                          }
+                        }}
+                        title={owner?.user_id ? 'عرض الملف الشخصي' : ''}
+                      >{owner?.name || `مساهم ${sh.owner_id}`}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>تاريخ التسجيل: {owner?.join_date}</div>
                     </div>
                     <div style={{ textAlign: 'left' }}>
@@ -1278,6 +1306,16 @@ export default function OwnersModule({ session }) {
             </button>
           </form>
         </div>
+      )}
+
+      {/* Owner Profile Modal */}
+      {showOwnerProfile && selectedOwner && (
+        <UserProfileModal
+          user={selectedOwner}
+          currentUser={session}
+          onClose={() => { setShowOwnerProfile(false); setSelectedOwner(null); }}
+          onUpdate={() => fetchData()}
+        />
       )}
     </div>
   );

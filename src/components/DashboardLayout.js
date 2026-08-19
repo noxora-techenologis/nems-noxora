@@ -73,6 +73,13 @@ export default function DashboardLayout({ children }) {
     }
     setSession(sess);
 
+    // Listen for profile changes (name, avatar, etc.)
+    const handleProfileChange = () => {
+      const updated = getSession();
+      if (updated) setSession(updated);
+    };
+    window.addEventListener('profile-change', handleProfileChange);
+
     // Fetch user notifications
     fetch(`/api/notifications?userId=${sess.user_id}`, { headers: getAuthHeaders() })
       .then(res => res.json())
@@ -82,7 +89,9 @@ export default function DashboardLayout({ children }) {
           setUnreadCount(data.notifications.filter(n => !n.is_read).length);
         }
       })
-      .catch(() => {});
+      .catch(err => console.error('Failed to fetch notifications:', err));
+
+    return () => window.removeEventListener('profile-change', handleProfileChange);
   }, [router]);
 
   useEffect(() => {
@@ -132,7 +141,8 @@ export default function DashboardLayout({ children }) {
         role: 'assistant',
         text: data.reply || 'عذراً، لم أستطع تحليل هذا الإجراء في الوقت الحالي.'
       }]);
-    } catch {
+    } catch (err) {
+      console.error(err);
       setAiMessages(prev => [...prev, {
         role: 'assistant',
         text: '⚠️ تعذر الاتصال بمحرك **Noxora AI**. يرجى المحاولة لاحقاً.'
@@ -277,7 +287,24 @@ export default function DashboardLayout({ children }) {
                       </div>
                     ) : (
                       notifications.map((n, idx) => (
-                        <div key={n.notification_id || `notif-${idx}`} className={`notif-item ${!n.is_read ? 'unread' : ''}`}>
+                        <div key={n.notification_id || `notif-${idx}`} className={`notif-item ${!n.is_read ? 'unread' : ''}`}
+                      onClick={async () => {
+                        if (!n.is_read) {
+                          try {
+                            await fetch('/api/notifications', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                              body: JSON.stringify({ notification_id: n.notification_id, user_id: sess.user_id }),
+                            });
+                            setNotifications(prev => prev.map(item => item.notification_id === n.notification_id ? { ...item, is_read: true } : item));
+                            setUnreadCount(prev => Math.max(0, prev - 1));
+                          } catch (err) {
+                            console.error('Failed to mark notification as read:', err);
+                          }
+                        }
+                      }}
+                      style={{ cursor: n.is_read ? 'default' : 'pointer' }}
+                    >
                           <div className="notif-title">{n.title}</div>
                           <div className="notif-msg">{n.message}</div>
                           <div className="notif-time">{n.created_at || 'الآن'}</div>

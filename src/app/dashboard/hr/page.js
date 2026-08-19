@@ -27,7 +27,7 @@ export default function HRDashboard() {
         todayAtt: (att.data || []).filter(a => sameDay(a.date, today)),
       });
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(err => { console.error('HR dashboard fetch error:', err); setLoading(false); });
   }, []);
 
   if (loading) return (

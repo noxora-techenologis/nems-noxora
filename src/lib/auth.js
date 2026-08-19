@@ -17,7 +17,8 @@ export function getSession() {
       return null;
     }
     return session;
-  } catch {
+  } catch (err) {
+    console.error('Failed to parse session:', err);
     return null;
   }
 }
@@ -109,5 +110,10 @@ export function getAuthHeaders() {
   if (typeof window === 'undefined') return {};
   const session = getSession();
   if (!session) return {};
+  // Re-check expiry in case session expired since last getPage
+  if (session.expires && Date.now() > session.expires) {
+    clearSession();
+    return {};
+  }
   return { 'x-user-id': String(session.user_id) };
 }

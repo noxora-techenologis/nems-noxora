@@ -12,6 +12,14 @@ export async function POST(request) {
       return NextResponse.json({ error: 'conversation_id مطلوب' }, { status: 400 });
     }
 
+    const memberCheck = await query(
+      `SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2`,
+      [conversation_id, user.user_id]
+    );
+    if (memberCheck.length === 0) {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
+    }
+
     await query(
       `UPDATE messages SET is_read = true, updated_at = NOW()
        WHERE conversation_id = $1 AND sender_id <> $2 AND is_read = false`,

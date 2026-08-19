@@ -4,15 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { setSession, getSession, getDashboardPath } from '@/lib/auth';
 
-const DEMO_ACCOUNTS = [
-  { label: 'مدير النظام', email: 'admin@noxora.com', password: 'admin123', color: '#8B5CF6' },
-  { label: 'المدير العام', email: 'ceo@noxora.com', password: 'ceo123', color: '#C0392B' },
-  { label: 'المالية', email: 'finance@noxora.com', password: 'finance123', color: '#F39C12' },
-  { label: 'الموارد البشرية', email: 'hr@noxora.com', password: 'hr123', color: '#27AE60' },
-  { label: 'مدير المشروع', email: 'pm@noxora.com', password: 'pm123', color: '#3498DB' },
-  { label: 'موظف', email: 'emp@noxora.com', password: 'emp123', color: '#1ABC9C' },
-  { label: 'المالك', email: 'owner@noxora.com', password: 'owner123', color: '#E67E22' },
-];
+// Demo accounts removed for security — never expose credentials in client bundle
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,12 +54,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillAccount = (account) => {
-    setEmail(account.email);
-    setPassword(account.password);
-    setError('');
-  };
-
   return (
     <div className="login-page">
       {/* Background orbs */}
@@ -104,7 +90,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} autoComplete="on">
           {/* Email */}
           <div className="login-input-wrap">
             <span className="input-icon">📧</span>

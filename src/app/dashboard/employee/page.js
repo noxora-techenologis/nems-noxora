@@ -27,7 +27,7 @@ export default function EmployeeDashboard() {
       fetch(`/api/dashboard/employee?employeeId=${sess.employee_id}`, { headers: getAuthHeaders() })
         .then(r => r.json())
         .then(d => { setData(d); setLoading(false); })
-        .catch(() => setLoading(false));
+        .catch(err => { console.error('Employee dashboard fetch error:', err); setLoading(false); });
     } else {
       setLoading(false);
     }
@@ -50,7 +50,8 @@ export default function EmployeeDashboard() {
       } else {
         alert(result.error || 'فشلت عملية التسجيل');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     } finally {
       setCheckingIn(false);

@@ -159,7 +159,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -191,7 +192,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -219,7 +221,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -243,7 +246,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -289,7 +293,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -341,7 +346,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -391,7 +397,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشل تحديث حالة المهمة');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
@@ -434,7 +441,8 @@ export default function ProjectsModule({ session }) {
       } else {
         alert(result.error || 'فشلت العملية');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       alert('تعذر الاتصال بالخادم');
     }
   };
