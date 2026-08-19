@@ -212,6 +212,8 @@ export default function EmployeeDashboard() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 {taskStats.completed > 0 && <span className="badge badge-success">✅ {taskStats.completed} مكتملة</span>}
                 {taskStats.in_progress > 0 && <span className="badge badge-warning">🔄 {taskStats.in_progress} جارية</span>}
+                {taskStats.new > 0 && <span className="badge badge-info">🆕 {taskStats.new} جديدة</span>}
+                {taskStats.delayed > 0 && <span className="badge badge-danger">⏰ {taskStats.delayed} متأخرة</span>}
               </div>
             </div>
             {myTasks.length === 0 ? (
@@ -222,25 +224,42 @@ export default function EmployeeDashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {myTasks.map(task => {
                   const statusBadge = TASK_STATUS[task.status] || { label: task.status, class: 'badge-muted' };
+                  const priorityMap = {
+                    critical: { label: '🚨 حرج', class: 'badge-danger' },
+                    high: { label: '🔥 عالي', class: 'badge-warning' },
+                    medium: { label: '⚡ متوسط', class: 'badge-info' },
+                    low: { label: '💤 منخفض', class: 'badge-muted' },
+                  };
+                  const priorityBadge = priorityMap[task.priority] || { label: task.priority || '', class: 'badge-muted' };
+                  const nextStatus = task.status === 'new' ? 'in_progress' : task.status === 'in_progress' ? 'completed' : null;
+
                   return (
                     <div key={task.task_id} id={`task-${task.task_id}`} style={{
-                      padding: '12px',
+                      padding: '14px',
                       background: 'var(--bg-secondary)',
                       borderRadius: 'var(--radius-md)',
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: '12px',
-                      border: '1px solid var(--border-primary)',
+                      border: task.is_delayed ? '1px solid rgba(231,76,60,0.4)' : '1px solid var(--border-primary)',
                     }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '13.5px', marginBottom: '6px' }}>{task.title}</div>
+                        <div style={{ fontWeight: 700, fontSize: '13.5px', marginBottom: '4px' }}>{task.title}</div>
+                        {task.description && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: 1.4 }}>{task.description}</div>
+                        )}
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <span className={`badge ${statusBadge.class}`}>{statusBadge.label}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📅 {task.deadline}</span>
-                          {task.completion_percentage > 0 && (
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                              {task.completion_percentage}% منجز
+                          {priorityBadge.label && <span className={`badge ${priorityBadge.class}`}>{priorityBadge.label}</span>}
+                          {task.deadline && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📅 {task.deadline}</span>}
+                          {task.is_delayed && <span className="badge badge-danger" style={{ fontSize: '10px' }}>⏰ متأخر</span>}
+                          {task.required_proof && task.required_proof !== 'none' && (
+                            <span className="badge badge-warning" style={{ fontSize: '10px' }}>
+                              🔒 إثبات: {task.required_proof === 'link' ? 'رابط' : task.required_proof === 'image' ? 'صورة' : task.required_proof === 'video' ? 'فيديو' : 'صوت'}
                             </span>
+                          )}
+                          {task.deduction_value > 0 && (
+                            <span className="badge badge-danger" style={{ fontSize: '10px' }}>💸 خصم: {task.deduction_value} MRU</span>
                           )}
                         </div>
                         {task.completion_percentage > 0 && (
@@ -251,7 +270,53 @@ export default function EmployeeDashboard() {
                             />
                           </div>
                         )}
+                        {task.attached_media && task.attached_media.url && (
+                          <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', fontSize: '11px', border: '1px dashed var(--border-accent)' }}>
+                            🎬 مرفق: <a href={task.attached_media.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--noxora-yellow-light)', textDecoration: 'underline' }}>فتح الملف المرفق</a>
+                          </div>
+                        )}
                       </div>
+                      {nextStatus && (
+                        <button
+                          id={`emp-update-task-${task.task_id}`}
+                          className="btn btn-secondary btn-sm"
+                          style={{ whiteSpace: 'nowrap', alignSelf: 'center' }}
+                          onClick={async () => {
+                            const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+                            const updateData = {
+                              _id: task.task_id,
+                              _userId: session.user_id,
+                              status: nextStatus,
+                              completion_percentage: nextStatus === 'completed' ? 100 : 50,
+                            };
+                            if (nextStatus === 'completed') {
+                              updateData.completed_at = nowStr;
+                              if (task.deadline && new Date(nowStr) > new Date(task.deadline)) {
+                                updateData.is_delayed = true;
+                              }
+                            }
+                            try {
+                              const res = await fetch('/api/data/tasks', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                                body: JSON.stringify(updateData),
+                              });
+                              const result = await res.json();
+                              if (result.success) {
+                                const d = await fetch(`/api/dashboard/employee?employeeId=${session.employee_id}`, { headers: getAuthHeaders() }).then(r => r.json());
+                                setData(d);
+                              } else {
+                                alert(result.error || 'فشل تحديث المهمة');
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert('تعذر الاتصال بالخادم');
+                            }
+                          }}
+                        >
+                          {nextStatus === 'in_progress' ? '🔄 بدء العمل' : '✅ إنهاء المهمة'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
