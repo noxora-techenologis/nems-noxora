@@ -679,6 +679,16 @@ CREATE TABLE IF NOT EXISTS company_debts (
   updated_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS debt_payments (
+  payment_id SERIAL PRIMARY KEY,
+  debt_id INT NOT NULL REFERENCES company_debts(debt_id) ON DELETE CASCADE,
+  amount DECIMAL(15,2) NOT NULL,
+  paid_date DATE DEFAULT CURRENT_DATE,
+  note TEXT,
+  created_by INT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- ============================================================
 -- MISSING COLUMNS (ALTER TABLE for existing tables)
 -- ============================================================
@@ -767,3 +777,5 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp);
 
 CREATE INDEX IF NOT EXISTS idx_company_debts_status ON company_debts(status);
 CREATE INDEX IF NOT EXISTS idx_company_debts_debtor_type ON company_debts(debtor_type);
+
+CREATE INDEX IF NOT EXISTS idx_debt_payments_debt_id ON debt_payments(debt_id);

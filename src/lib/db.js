@@ -17,7 +17,7 @@ export const SAFE_TABLES = new Set([
   'audit_log', 'system_settings', 'position_requests', 'permissions',
   'role_permissions', 'company_valuation', 'company_debts', 'withdrawal_requests',
   'wallets', 'wallet_transactions', 'topup_requests',
-  'project_investments', 'project_proposals', 'project_votes'
+  'project_investments', 'project_proposals', 'project_votes', 'debt_payments'
 ]);
 
 const PRIMARY_KEYS = {
@@ -39,7 +39,7 @@ const PRIMARY_KEYS = {
   wallets: 'wallet_id', wallet_transactions: 'transaction_id',
   topup_requests: 'request_id',
   project_investments: 'investment_id', project_proposals: 'proposal_id',
-  project_votes: 'vote_id'
+  project_votes: 'vote_id', debt_payments: 'payment_id'
 };
 
 const MODULE_MAP = {
@@ -55,7 +55,7 @@ const MODULE_MAP = {
   conversations: 'Collaboration', conversation_members: 'Collaboration', messages: 'Collaboration',
   announcements: 'Collaboration',
   files: 'Documents', project_documents: 'Documents', file_versions: 'Documents',
-  company_debts: 'Debts',
+  company_debts: 'Debts', debt_payments: 'Debts',
   withdrawal_requests: 'Owners',
   notifications: 'System', feedback_reports: 'System', audit_log: 'System', system_settings: 'System',
   company_valuation: 'Shares',

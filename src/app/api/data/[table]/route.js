@@ -192,6 +192,7 @@ export async function PUT(request, { params }) {
       expenses: new Set(['password_hash', 'created_at', 'role_id']),
       budgets: new Set(['password_hash', 'created_at', 'role_id']),
       salaries: new Set(['password_hash', 'created_at', 'role_id']),
+      company_debts: new Set(['password_hash', 'created_at', 'role_id']),
     };
     const defaultBlocked = new Set(['password_hash', 'created_at', 'role_id', 'status']);
     const BLOCKED_FIELDS = TABLE_BLOCKED_FIELDS[table] || defaultBlocked;

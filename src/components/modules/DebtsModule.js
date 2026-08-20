@@ -1,18 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatCurrency as formatCurrencyImport } from '@/lib/format';
+import { formatCurrency as formatCurrencyImport, getPreferredCurrency } from '@/lib/format';
 import { getAuthHeaders } from '@/lib/auth';
 
 export default function DebtsModule({ session }) {
   const [debts, setDebts] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   const [selectedDebt, setSelectedDebt] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showPayForm, setShowPayForm] = useState(false);
   const [payAmount, setPayAmount] = useState('');
-  const [, setCurrTick] = useState(0);
+  const [payNote, setPayNote] = useState('');
+  const [currTick, setCurrTick] = useState(0);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   useEffect(() => {
     const handleCurrChange = () => setCurrTick(t => t + 1);
@@ -28,6 +36,9 @@ export default function DebtsModule({ session }) {
   const [dueDate, setDueDate] = useState('');
   const [description, setDescription] = useState('');
 
+  // Edit form
+  const [editDebt, setEditDebt] = useState(null);
+
   const role = session.role_name?.toLowerCase() || '';
   const canManage = ['ceo', 'fm', 'admin'].includes(role);
   const canView = canManage || ['owner'].includes(role);
@@ -37,9 +48,14 @@ export default function DebtsModule({ session }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/company_debts', { headers: getAuthHeaders() });
-      const data = await res.json();
-      setDebts(data.data || []);
+      const [debtRes, payRes] = await Promise.all([
+        fetch('/api/data/company_debts', { headers: getAuthHeaders() }),
+        fetch('/api/data/debt_payments', { headers: getAuthHeaders() }).catch(() => ({ ok: false })),
+      ]);
+      const debtData = await debtRes.json();
+      const payData = payRes.ok ? await payRes.json() : { data: [] };
+      setDebts(debtData.data || []);
+      setPayments(payData.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -50,6 +66,14 @@ export default function DebtsModule({ session }) {
   const handleAddDebt = async (e) => {
     e.preventDefault();
     if (!debtorName || !amount) return;
+    if (dueDate && borrowDate && dueDate < borrowDate) {
+      alert('تاريخ الاستحقاق يجب أن يكون بعد تاريخ الاستدانة');
+      return;
+    }
+    if (Number(amount) <= 0) {
+      alert('قيمة الدين يجب أن تكون أكبر من صفر');
+      return;
+    }
     try {
       const res = await fetch('/api/data/company_debts', {
         method: 'POST',
@@ -70,16 +94,51 @@ export default function DebtsModule({ session }) {
       const result = await res.json();
       if (result.success) {
         alert('تم تسجيل الدين بنجاح!');
-        setDebtorName('');
-        setDebtorType('عميل');
-        setAmount('');
-        setBorrowDate(new Date().toISOString().split('T')[0]);
-        setDueDate('');
-        setDescription('');
+        resetAddForm();
         setShowAddForm(false);
         fetchData();
       } else {
         alert(result.error || 'فشلت عملية الإضافة');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
+
+  const handleEditDebt = async (e) => {
+    e.preventDefault();
+    if (!editDebt) return;
+    if (editDebt.due_date && editDebt.borrowing_date && editDebt.due_date < editDebt.borrowing_date) {
+      alert('تاريخ الاستحقاق يجب أن يكون بعد تاريخ الاستدانة');
+      return;
+    }
+    if (Number(editDebt.amount) <= 0) {
+      alert('قيمة الدين يجب أن تكون أكبر من صفر');
+      return;
+    }
+    try {
+      const res = await fetch('/api/data/company_debts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          _id: editDebt.debt_id,
+          _userId: session.user_id,
+          debtor_name: editDebt.debtor_name,
+          debtor_type: editDebt.debtor_type,
+          amount: Number(editDebt.amount),
+          borrowing_date: editDebt.borrowing_date,
+          due_date: editDebt.due_date || null,
+          description: editDebt.description || '',
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم تعديل الدين بنجاح!');
+        setEditDebt(null);
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت عملية التعديل');
       }
     } catch (err) {
       console.error(err);
@@ -93,13 +152,15 @@ export default function DebtsModule({ session }) {
     const payAmt = Number(payAmount);
     const remaining = Number(selectedDebt.amount) - Number(selectedDebt.paid_amount);
     if (payAmt <= 0 || payAmt > remaining) {
-      alert(`المبلغ يجب أن يكون بين 1 و ${remaining}`);
+      alert(`المبلغ يجب أن يكون بين 1 و ${formatCurrency(remaining)}`);
       return;
     }
     try {
       const newPaid = Number(selectedDebt.paid_amount) + payAmt;
       const newStatus = newPaid >= Number(selectedDebt.amount) ? 'paid' : 'partial';
-      const res = await fetch('/api/data/company_debts', {
+
+      // 1. Update the debt
+      const updateRes = await fetch('/api/data/company_debts', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
@@ -109,16 +170,32 @@ export default function DebtsModule({ session }) {
           status: newStatus,
         }),
       });
-      const result = await res.json();
-      if (result.success) {
-        alert(`تم تسجيل سداد ${formatCurrency(payAmt)} بنجاح!`);
-        setPayAmount('');
-        setShowPayForm(false);
-        setSelectedDebt({ ...selectedDebt, paid_amount: newPaid, status: newStatus });
-        fetchData();
-      } else {
-        alert(result.error || 'فشلت عملية السداد');
+      const updateResult = await updateRes.json();
+      if (!updateResult.success) {
+        alert(updateResult.error || 'فشلت عملية السداد');
+        return;
       }
+
+      // 2. Record payment history
+      await fetch('/api/data/debt_payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          debt_id: selectedDebt.debt_id,
+          amount: payAmt,
+          paid_date: new Date().toISOString().split('T')[0],
+          note: payNote || null,
+          created_by: session.user_id,
+          _userId: session.user_id,
+        }),
+      });
+
+      alert(`تم تسجيل سداد ${formatCurrency(payAmt)} بنجاح!`);
+      setPayAmount('');
+      setPayNote('');
+      setShowPayForm(false);
+      setSelectedDebt({ ...selectedDebt, paid_amount: newPaid, status: newStatus });
+      fetchData();
     } catch (err) {
       console.error(err);
       alert('تعذر الاتصال بالخادم');
@@ -126,12 +203,11 @@ export default function DebtsModule({ session }) {
   };
 
   const handleDelete = async (debtId) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الدين؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الدين؟ سيتم حذف جميع الدفعت أيضاً.')) return;
     try {
-      const res = await fetch('/api/data/company_debts', {
+      const res = await fetch(`/api/data/company_debts?id=${debtId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ _id: debtId, _userId: session.user_id }),
+        headers: { ...getAuthHeaders() },
       });
       const result = await res.json();
       if (result.success) {
@@ -147,19 +223,80 @@ export default function DebtsModule({ session }) {
     }
   };
 
-  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
+  const resetAddForm = () => {
+    setDebtorName('');
+    setDebtorType('عميل');
+    setAmount('');
+    setBorrowDate(new Date().toISOString().split('T')[0]);
+    setDueDate('');
+    setDescription('');
+  };
 
-  const filtered = debts.filter(d =>
-    (d.debtor_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (d.description || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const formatCurrency = (n) => formatCurrencyImport(n, getPreferredCurrency());
+
+  const isOverdue = (d) => {
+    if (!d.due_date || d.status === 'paid') return false;
+    return new Date(d.due_date) < new Date(new Date().toDateString());
+  };
+
+  const daysOverdue = (d) => {
+    if (!isOverdue(d)) return 0;
+    const diff = new Date(new Date().toDateString()) - new Date(d.due_date);
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  };
+
+  // Filtering
+  let filtered = debts.filter(d => {
+    const matchSearch = !search ||
+      (d.debtor_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (d.description || '').toLowerCase().includes(search.toLowerCase());
+    const matchType = !filterType || d.debtor_type === filterType;
+    const matchStatus = !filterStatus ||
+      (filterStatus === 'overdue' ? isOverdue(d) : d.status === filterStatus);
+    return matchSearch && matchType && matchStatus;
+  });
+
+  // Sorting
+  filtered.sort((a, b) => {
+    let va, vb;
+    switch (sortBy) {
+      case 'debtor_name': va = a.debtor_name || ''; vb = b.debtor_name || ''; break;
+      case 'amount': va = Number(a.amount); vb = Number(b.amount); break;
+      case 'remaining': va = Number(a.amount) - Number(a.paid_amount); vb = Number(b.amount) - Number(b.paid_amount); break;
+      case 'due_date': va = a.due_date || '9999-12-31'; vb = b.due_date || '9999-12-31'; break;
+      case 'status': va = a.status; vb = b.status; break;
+      default: va = a.created_at || ''; vb = b.created_at || '';
+    }
+    if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortDir === 'asc' ? va - vb : vb - va;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [search, filterType, filterStatus, sortBy, sortDir]);
 
   const totalOutstanding = debts
     .filter(d => d.status !== 'paid')
     .reduce((s, d) => s + (Number(d.amount) - Number(d.paid_amount)), 0);
 
+  const overdueCount = debts.filter(d => isOverdue(d)).length;
+  const overdueAmount = debts.filter(d => isOverdue(d))
+    .reduce((s, d) => s + (Number(d.amount) - Number(d.paid_amount)), 0);
+
   const statusLabel = (s) => s === 'paid' ? 'تم السداد' : s === 'partial' ? 'مدفوع جزئياً' : 'مستحق';
   const statusColor = (s) => s === 'paid' ? 'var(--success)' : s === 'partial' ? 'var(--warning)' : 'var(--danger)';
+
+  const getDebtPayments = (debtId) => payments.filter(p => p.debt_id === debtId).sort((a, b) => new Date(b.paid_date) - new Date(a.paid_date));
+
+  const toggleSort = (field) => {
+    if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(field); setSortDir('asc'); }
+  };
+
+  const sortIcon = (field) => sortBy === field ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   if (!canView) return null;
 
@@ -179,43 +316,37 @@ export default function DebtsModule({ session }) {
           <p className="page-subtitle">توثيق المبالغ والخدمات المستعارة من الآخرين</p>
         </div>
         {canManage && (
-          <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
+          <button className="btn btn-primary" onClick={() => { setShowAddForm(!showAddForm); setEditDebt(null); }}>
             {showAddForm ? 'إلغاء' : '+ دين جديد'}
           </button>
         )}
       </div>
 
-      {/* Total Outstanding Banner */}
-      <div style={{
-        padding: '20px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--danger)', marginBottom: '20px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-      }}>
-        <div>
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>إجمالي الديون المستحقة (المتبقة)</div>
-          <div style={{ fontSize: '28px', fontWeight: 900, color: 'var(--danger)', marginTop: '4px' }}>
-            {formatCurrency(totalOutstanding)}
+      {/* Summary Banner */}
+      <div style={{ padding: '20px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '160px', borderRight: '3px solid var(--danger)', paddingRight: '16px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>إجمالي المتبقة</div>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--danger)', marginTop: '4px' }}>{formatCurrency(totalOutstanding)}</div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '20px', textAlign: 'center' }}>
-          <div>
-            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--danger)' }}>
-              {debts.filter(d => d.status === 'pending').length}
-            </div>
+          <div style={{ flex: 1, minWidth: '120px', textAlign: 'center' }}>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--danger)' }}>{debts.filter(d => d.status === 'pending').length}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>مستحقة</div>
           </div>
-          <div>
-            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--warning)' }}>
-              {debts.filter(d => d.status === 'partial').length}
-            </div>
+          <div style={{ flex: 1, minWidth: '120px', textAlign: 'center' }}>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--warning)' }}>{debts.filter(d => d.status === 'partial').length}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>جزئية</div>
           </div>
-          <div>
-            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--success)' }}>
-              {debts.filter(d => d.status === 'paid').length}
-            </div>
+          <div style={{ flex: 1, minWidth: '120px', textAlign: 'center' }}>
+            <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--success)' }}>{debts.filter(d => d.status === 'paid').length}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>مدفوعة</div>
           </div>
+          {overdueCount > 0 && (
+            <div style={{ flex: 1, minWidth: '140px', textAlign: 'center', background: '#dc354515', borderRadius: '8px', padding: '8px 12px' }}>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: '#dc3545' }}>⚠ {overdueCount}</div>
+              <div style={{ fontSize: '11px', color: '#dc3545' }}>متأخرة — {formatCurrency(overdueAmount)}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -242,7 +373,7 @@ export default function DebtsModule({ session }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
               <div className="form-group">
-                <label className="form-label">قيمة الدين (MRU)</label>
+                <label className="form-label">قيمة الدين ({getPreferredCurrency()})</label>
                 <input type="number" className="form-input" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" required min="1" />
               </div>
               <div className="form-group">
@@ -250,8 +381,8 @@ export default function DebtsModule({ session }) {
                 <input type="date" className="form-input" value={borrowDate} onChange={e => setBorrowDate(e.target.value)} required />
               </div>
               <div className="form-group">
-                <label className="form-label">تاريخ الاستحقاق</label>
-                <input type="date" className="form-input" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                <label className="form-label">تاريخ الاستحقاق (اختياري)</label>
+                <input type="date" className="form-input" value={dueDate} onChange={e => setDueDate(e.target.value)} min={borrowDate} />
               </div>
             </div>
             <div className="form-group">
@@ -263,59 +394,82 @@ export default function DebtsModule({ session }) {
         </div>
       )}
 
+      {/* Filters & Search */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="text" placeholder="🔍 بحث بالاسم أو الوصف..." className="form-input" value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: '200px', padding: '8px 12px', fontSize: '13px' }} />
+        <select className="form-select" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', minWidth: '140px' }}>
+          <option value="">جميع الأنواع</option>
+          <option value="عميل">عميل</option>
+          <option value="رجل أعمال">رجل أعمال</option>
+          <option value="جهة خارجية">جهة خارجية</option>
+        </select>
+        <select className="form-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ padding: '8px 12px', fontSize: '13px', minWidth: '140px' }}>
+          <option value="">جميع الحالات</option>
+          <option value="pending">مستحق</option>
+          <option value="partial">مدفوع جزئياً</option>
+          <option value="paid">مدفوع</option>
+          <option value="overdue">⚠ متأخر</option>
+        </select>
+      </div>
+
       <div className="grid-cols-2-1">
         {/* Debt List */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">سجل الديون ({filtered.length})</h2>
-            <div style={{ width: '200px' }}>
-              <input
-                type="text"
-                placeholder="بحث بالاسم أو الوصف..."
-                className="form-input"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ padding: '6px 12px', fontSize: '12px' }}
-              />
-            </div>
           </div>
           <div className="table-wrapper">
             <table>
               <thead>
                 <tr>
-                  <th>المدين</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('debtor_name')}>المدين{sortIcon('debtor_name')}</th>
                   <th>النوع</th>
-                  <th>المبلغ</th>
-                  <th>المتبقي</th>
-                  <th>الحالة</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('amount')}>المبلغ{sortIcon('amount')}</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('remaining')}>المتبقي{sortIcon('remaining')}</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('due_date')}>الاستحقاق{sortIcon('due_date')}</th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('status')}>الحالة{sortIcon('status')}</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(d => {
+                {paginated.map(d => {
                   const remaining = Number(d.amount) - Number(d.paid_amount);
+                  const overdue = isOverdue(d);
                   return (
                     <tr
                       key={d.debt_id}
-                      onClick={() => { setSelectedDebt(d); setShowPayForm(false); }}
-                      style={{ cursor: 'pointer', background: selectedDebt?.debt_id === d.debt_id ? 'var(--bg-card-hover)' : '' }}
+                      onClick={() => { setSelectedDebt(d); setShowPayForm(false); setEditDebt(null); }}
+                      style={{ cursor: 'pointer', background: selectedDebt?.debt_id === d.debt_id ? 'var(--bg-card-hover)' : '', borderLeft: overdue ? '4px solid #dc3545' : '' }}
                     >
-                      <td style={{ fontWeight: 700 }}>{d.debtor_name}</td>
-                      <td>{d.debtor_type}</td>
-                      <td>{formatCurrency(d.amount)}</td>
-                      <td style={{ color: remaining > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 700 }}>
-                        {formatCurrency(remaining)}
+                      <td style={{ fontWeight: 700 }}>
+                        {overdue && <span title={`متأخر ${daysOverdue(d)} يوم`} style={{ color: '#dc3545', marginRight: '4px' }}>⚠</span>}
+                        {d.debtor_name}
                       </td>
+                      <td style={{ fontSize: '12px' }}>{d.debtor_type}</td>
+                      <td>{formatCurrency(d.amount)}</td>
+                      <td style={{ color: remaining > 0 ? 'var(--danger)' : 'var(--success)', fontWeight: 700 }}>{formatCurrency(remaining)}</td>
+                      <td style={{ fontSize: '12px', color: overdue ? '#dc3545' : 'var(--text-muted)' }}>{d.due_date || '—'}</td>
                       <td>
-                        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, color: statusColor(d.status), background: `${statusColor(d.status)}15` }}>
-                          {statusLabel(d.status)}
+                        <span style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, color: overdue ? '#dc3545' : statusColor(d.status), background: overdue ? '#dc354515' : `${statusColor(d.status)}15` }}>
+                          {overdue ? `متأخر ${daysOverdue(d)} يوم` : statusLabel(d.status)}
                         </span>
                       </td>
                     </tr>
                   );
                 })}
+                {paginated.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>لا توجد نتائج</td></tr>
+                )}
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '12px', borderTop: '1px solid var(--border)' }}>
+              <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>السابق</button>
+              <span style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--text-muted)' }}>{page} / {totalPages}</span>
+              <button className="btn btn-secondary btn-sm" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>التالي</button>
+            </div>
+          )}
         </div>
 
         {/* Details Panel */}
@@ -325,14 +479,20 @@ export default function DebtsModule({ session }) {
               <div className="card-header">
                 <h2 className="card-title">تفاصيل الدين</h2>
                 {canManage && selectedDebt.status !== 'paid' && (
-                  <button className="btn btn-primary btn-sm" onClick={() => setShowPayForm(!showPayForm)}>
-                    💰 تسجيل سداد
+                  <button className="btn btn-primary btn-sm" onClick={() => { setShowPayForm(!showPayForm); setEditDebt(null); }}>
+                    💰 سداد
                   </button>
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {isOverdue(selectedDebt) && (
+                  <div style={{ padding: '10px 14px', background: '#dc354515', borderRadius: '8px', border: '1px solid #dc354530', fontSize: '13px', color: '#dc3545', fontWeight: 700 }}>
+                    ⚠ هذا الدين متأخر منذ {daysOverdue(selectedDebt)} يوم — تاريخ الاستحقاق: {selectedDebt.due_date}
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                  <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', background: statusColor(selectedDebt.status) }}>
+                  <div className="user-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', background: isOverdue(selectedDebt) ? '#dc3545' : statusColor(selectedDebt.status) }}>
                     {selectedDebt.debtor_name?.[0] || 'D'}
                   </div>
                   <div>
@@ -354,23 +514,21 @@ export default function DebtsModule({ session }) {
                   </div>
                   <div>
                     <div className="form-label">المتبقي</div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--warning)' }}>
-                      {formatCurrency(Number(selectedDebt.amount) - Number(selectedDebt.paid_amount))}
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--warning)' }}>{formatCurrency(Number(selectedDebt.amount) - Number(selectedDebt.paid_amount))}</div>
                   </div>
                   <div>
                     <div className="form-label">الحالة</div>
-                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, color: statusColor(selectedDebt.status), background: `${statusColor(selectedDebt.status)}15` }}>
-                      {statusLabel(selectedDebt.status)}
+                    <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, color: isOverdue(selectedDebt) ? '#dc3545' : statusColor(selectedDebt.status), background: isOverdue(selectedDebt) ? '#dc354515' : `${statusColor(selectedDebt.status)}15` }}>
+                      {isOverdue(selectedDebt) ? `متأخر ${daysOverdue(selectedDebt)} يوم` : statusLabel(selectedDebt.status)}
                     </span>
                   </div>
                   <div>
                     <div className="form-label">تاريخ الاستدانة</div>
-                    <div>{selectedDebt.borrowing_date}</div>
+                    <div style={{ fontSize: '13px' }}>{selectedDebt.borrowing_date || '—'}</div>
                   </div>
                   <div>
                     <div className="form-label">تاريخ الاستحقاق</div>
-                    <div>{selectedDebt.due_date || 'غير محدد'}</div>
+                    <div style={{ fontSize: '13px', color: isOverdue(selectedDebt) ? '#dc3545' : 'inherit' }}>{selectedDebt.due_date || 'غير محدد'}</div>
                   </div>
                 </div>
 
@@ -396,13 +554,35 @@ export default function DebtsModule({ session }) {
                   </div>
                 )}
 
+                {/* Payment History */}
+                {getDebtPayments(selectedDebt.debt_id).length > 0 && (
+                  <div style={{ marginTop: '8px' }}>
+                    <div className="form-label" style={{ marginBottom: '6px' }}>سجل الدفعات ({getDebtPayments(selectedDebt.debt_id).length})</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '200px', overflowY: 'auto' }}>
+                      {getDebtPayments(selectedDebt.debt_id).map(p => (
+                        <div key={p.payment_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px', fontSize: '12px' }}>
+                          <div>
+                            <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(p.amount)}</span>
+                            {p.note && <span style={{ color: 'var(--text-muted)', marginRight: '8px' }}>— {p.note}</span>}
+                          </div>
+                          <span style={{ color: 'var(--text-muted)' }}>{p.paid_date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Pay Form */}
                 {showPayForm && canManage && selectedDebt.status !== 'paid' && (
                   <form onSubmit={handlePay} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-accent)' }}>
                     <div style={{ fontWeight: 700, fontSize: '13px' }}>تسجيل دفعة سداد</div>
                     <div className="form-group">
-                      <label className="form-label">مبلغ السداد (MRU) — المتبقي: {formatCurrency(Number(selectedDebt.amount) - Number(selectedDebt.paid_amount))}</label>
+                      <label className="form-label">مبلغ السداد ({getPreferredCurrency()}) — المتبقي: {formatCurrency(Number(selectedDebt.amount) - Number(selectedDebt.paid_amount))}</label>
                       <input type="number" className="form-input" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="أدخل المبلغ" required min="1" max={Number(selectedDebt.amount) - Number(selectedDebt.paid_amount)} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">ملاحظة (اختياري)</label>
+                      <input type="text" className="form-input" value={payNote} onChange={e => setPayNote(e.target.value)} placeholder="مثال: دفعة أولى" />
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>تأكيد السداد</button>
@@ -411,10 +591,55 @@ export default function DebtsModule({ session }) {
                   </form>
                 )}
 
+                {/* Edit Form */}
+                {editDebt && (
+                  <form onSubmit={handleEditDebt} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-accent)' }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px' }}>تعديل الدين</div>
+                    <div className="form-group">
+                      <label className="form-label">اسم المدين</label>
+                      <input type="text" className="form-input" value={editDebt.debtor_name} onChange={e => setEditDebt({ ...editDebt, debtor_name: e.target.value })} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">نوع المدين</label>
+                      <select className="form-select" value={editDebt.debtor_type} onChange={e => setEditDebt({ ...editDebt, debtor_type: e.target.value })}>
+                        <option value="عميل">عميل</option>
+                        <option value="رجل أعمال">رجل أعمال</option>
+                        <option value="جهة خارجية">جهة خارجية</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">قيمة الدين ({getPreferredCurrency()})</label>
+                      <input type="number" className="form-input" value={editDebt.amount} onChange={e => setEditDebt({ ...editDebt, amount: e.target.value })} min="1" required />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div className="form-group">
+                        <label className="form-label">تاريخ الاستدانة</label>
+                        <input type="date" className="form-input" value={editDebt.borrowing_date || ''} onChange={e => setEditDebt({ ...editDebt, borrowing_date: e.target.value })} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">تاريخ الاستحقاق</label>
+                        <input type="date" className="form-input" value={editDebt.due_date || ''} onChange={e => setEditDebt({ ...editDebt, due_date: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">الوصف</label>
+                      <input type="text" className="form-input" value={editDebt.description || ''} onChange={e => setEditDebt({ ...editDebt, description: e.target.value })} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>حفظ التعديل</button>
+                      <button type="button" className="btn btn-secondary" onClick={() => setEditDebt(null)}>إلغاء</button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Action Buttons */}
                 {canManage && (
-                  <button className="btn btn-danger btn-sm" style={{ alignSelf: 'flex-start', marginTop: '8px' }} onClick={() => handleDelete(selectedDebt.debt_id)}>
-                    🗑️ حذف الدين
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    {selectedDebt.status !== 'paid' && !editDebt && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => { setEditDebt({ ...selectedDebt }); setShowPayForm(false); }}>✏️ تعديل</button>
+                    )}
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedDebt.debt_id)}>🗑️ حذف</button>
+                  </div>
                 )}
               </div>
             </div>
