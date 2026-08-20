@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { getTable, query, transaction } from '@/lib/db';
 import { verifySession } from '@/lib/serverAuth';
 
+/**
+ * POST /api/votes/cast
+ * Body: { vote_id, option_id }
+ * Records the vote and recalculates ALL weighted percentages atomically.
+ */
 export async function POST(request) {
   try {
     const { user, error: authError } = await verifySession(request);
@@ -11,82 +16,94 @@ export async function POST(request) {
     const { vote_id, option_id } = body;
 
     if (!vote_id || !option_id) {
-      return NextResponse.json({ error: 'vote_id و option_id مطلوبان' }, { status: 400 });
+      return NextResponse.json({ error: 'vote_id و option_id مطلوبين' }, { status: 400 });
     }
 
-    // Check if already voted
-    const existingVotes = await getTable('user_votes');
-    const alreadyVoted = existingVotes.some(uv => uv.vote_id === Number(vote_id) && uv.user_id === user.user_id);
-    if (alreadyVoted) {
-      return NextResponse.json({ error: 'لقد قمت بالتصويت على هذا القرار مسبقاً' }, { status: 400 });
-    }
+    const result = await transaction(async (q) => {
+      // 1. Check vote exists and is active
+      const votes = await q(`SELECT * FROM "votes" WHERE "vote_id" = $1 FOR UPDATE`, [vote_id]);
+      const vote = votes[0];
+      if (!vote) throw new Error('VOTE_NOT_FOUND');
+      if (vote.status !== 'active') throw new Error('VOTE_CLOSED');
 
-    // Check vote is active
-    const votes = await getTable('votes');
-    const vote = votes.find(v => v.vote_id === Number(vote_id));
-    if (!vote) {
-      return NextResponse.json({ error: 'القرار غير موجود' }, { status: 404 });
-    }
-    if (vote.status !== 'active') {
-      return NextResponse.json({ error: 'هذا القرار مغلق ولا يمكن التصويت عليه' }, { status: 400 });
-    }
+      // 2. Check end_date hasn't passed
+      if (vote.end_date && new Date(vote.end_date) < new Date()) {
+        throw new Error('VOTE_EXPIRED');
+      }
 
-    // Get owner shares weight
-    const owners = await getTable('owners');
-    const shares = await getTable('shares');
-    const ownerRecord = owners.find(o => o.user_id === user.user_id);
-    if (!ownerRecord) {
-      return NextResponse.json({ error: 'لم يُعثر على سجل ملكيتك' }, { status: 400 });
-    }
-    const myShares = shares.find(s => s.owner_id === ownerRecord.owner_id);
-    const sharesWeight = myShares ? Number(myShares.total_shares) : 100;
-    const totalShares = shares.reduce((s, sh) => s + (Number(sh.total_shares) || 0), 0);
+      // 3. Check if user already voted
+      const existingVotes = await q(
+        `SELECT * FROM "user_votes" WHERE "vote_id" = $1 AND "user_id" = $2`,
+        [vote_id, user.user_id]
+      );
+      if (existingVotes.length > 0) throw new Error('ALREADY_VOTED');
 
-    // Record vote + recalculate percentages atomically
-    await transaction(async (q) => {
-      // 1. Record user vote
+      // 4. Get the user's share weight
+      const owners = await q(`SELECT * FROM "owners" WHERE "user_id" = $1`, [user.user_id]);
+      const owner = owners[0];
+      let sharesWeight = 100;
+      if (owner) {
+        const shares = await q(`SELECT * FROM "shares" WHERE "owner_id" = $1`, [owner.owner_id]);
+        if (shares[0]) sharesWeight = Number(shares[0].total_shares) || 100;
+      }
+
+      // 5. Record the vote
       await q(
         `INSERT INTO "user_votes" ("vote_id", "option_id", "user_id", "shares_weight", "created_at", "updated_at")
          VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-        [Number(vote_id), Number(option_id), user.user_id, sharesWeight]
+        [vote_id, option_id, user.user_id, sharesWeight]
       );
 
-      // 2. Increment votes_count on the selected option
-      await q(
-        `UPDATE "vote_options" SET "votes_count" = "votes_count" + 1, "updated_at" = NOW()
-         WHERE "option_id" = $1`,
-        [Number(option_id)]
+      // 6. Recalculate ALL weighted percentages for this vote from scratch (atomic)
+      const allUserVotes = await q(
+        `SELECT * FROM "user_votes" WHERE "vote_id" = $1`,
+        [vote_id]
       );
 
-      // 3. Recalculate ALL weighted percentages for this vote from scratch
-      if (totalShares > 0) {
-        const allUserVotes = await q(
-          `SELECT "option_id", SUM("shares_weight") as total_weight
-           FROM "user_votes" WHERE "vote_id" = $1 GROUP BY "option_id"`,
-          [Number(vote_id)]
-        );
+      // Sum total weight across all votes cast
+      const totalWeight = allUserVotes.reduce((s, uv) => s + (Number(uv.shares_weight) || 100), 0);
 
-        for (const row of allUserVotes) {
-          const weightedPct = Math.round((Number(row.total_weight) / totalShares) * 10000) / 100;
-          await q(
-            `UPDATE "vote_options" SET "weighted_percentage" = $1, "updated_at" = NOW()
-             WHERE "option_id" = $2`,
-            [Math.min(100, weightedPct), row.option_id]
-          );
-        }
+      // Get all options for this vote
+      const allOptions = await q(
+        `SELECT * FROM "vote_options" WHERE "vote_id" = $1`,
+        [vote_id]
+      );
 
-        // Zero out options with no votes
+      for (const opt of allOptions) {
+        // Sum weights for this option
+        const optVotes = allUserVotes.filter(uv => uv.option_id === opt.option_id);
+        const optWeight = optVotes.reduce((s, uv) => s + (Number(uv.shares_weight) || 100), 0);
+        const weightedPct = totalWeight > 0 ? Math.round((optWeight / totalWeight) * 10000) / 100 : 0;
+
         await q(
-          `UPDATE "vote_options" SET "weighted_percentage" = 0, "updated_at" = NOW()
-           WHERE "vote_id" = $1 AND "option_id" NOT IN (SELECT "option_id" FROM "user_votes" WHERE "vote_id" = $1)`,
-          [Number(vote_id)]
+          `UPDATE "vote_options" SET "votes_count" = $1, "weighted_percentage" = $2, "updated_at" = NOW()
+           WHERE "option_id" = $3`,
+          [optVotes.length, Math.min(100, weightedPct), opt.option_id]
         );
       }
+
+      return { sharesWeight, totalWeight };
     });
 
-    return NextResponse.json({ success: true, message: 'تم تسجيل صوتك بنجاح!' });
+    return NextResponse.json({
+      success: true,
+      message: 'تم تسجيل صوتك بنجاح',
+      shares_weight: result.sharesWeight,
+    });
   } catch (err) {
-    console.error('Vote cast Error:', err);
+    if (err.message === 'VOTE_NOT_FOUND') {
+      return NextResponse.json({ error: 'القرار غير موجود' }, { status: 404 });
+    }
+    if (err.message === 'VOTE_CLOSED') {
+      return NextResponse.json({ error: 'هذا القرار مغلق' }, { status: 400 });
+    }
+    if (err.message === 'VOTE_EXPIRED') {
+      return NextResponse.json({ error: 'انتهت مهلة التصويت' }, { status: 400 });
+    }
+    if (err.message === 'ALREADY_VOTED') {
+      return NextResponse.json({ error: 'لقد قمت بالتصويت على هذا القرار مسبقاً' }, { status: 400 });
+    }
+    console.error('Vote Cast Error:', err);
     return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
   }
 }

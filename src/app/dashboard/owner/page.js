@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatCurrency as formatCurrencyImport, formatNumber } from '@/lib/format';
+import { formatCurrency as formatCurrencyImport, formatNumber, getPreferredCurrency } from '@/lib/format';
 import DashboardLayout from '@/components/DashboardLayout';
 import { getAuthHeaders } from '@/lib/auth';
 
@@ -51,7 +51,7 @@ export default function OwnerDashboard() {
   const { owners = [], shares = [], distributions = [], votes = [], voteOptions = [], valuation = null } = data || {};
 
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
-  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
+  const formatCurrency = (n) => formatCurrencyImport(n, getPreferredCurrency());
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
   const companyValue = valuation ? (Number(valuation.company_value) || 0) : 0;

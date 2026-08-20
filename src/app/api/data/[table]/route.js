@@ -18,6 +18,15 @@ const TABLE_ROLES = {
   system_settings: ['admin'],
   role_permissions: ['admin'],
   permissions: ['admin'],
+  owners: ['admin', 'ceo', 'fm', 'owner'],
+  shares: ['admin', 'ceo', 'fm', 'owner'],
+  share_transactions: ['admin', 'ceo', 'fm', 'owner'],
+  profit_distributions: ['admin', 'ceo', 'fm', 'owner'],
+  company_valuation: ['admin', 'ceo', 'fm', 'owner'],
+  votes: ['admin', 'ceo', 'owner'],
+  vote_options: ['admin', 'ceo', 'owner'],
+  user_votes: ['admin', 'ceo', 'owner'],
+  position_requests: ['admin', 'ceo', 'owner'],
 };
 
 // Resolve the user's actual role name from the roles table (users.role_name is not populated)
@@ -193,6 +202,8 @@ export async function PUT(request, { params }) {
       budgets: new Set(['password_hash', 'created_at', 'role_id']),
       salaries: new Set(['password_hash', 'created_at', 'role_id']),
       company_debts: new Set(['password_hash', 'created_at', 'role_id']),
+      votes: new Set(['password_hash', 'created_at', 'role_id']),
+      vote_options: new Set(['password_hash', 'created_at', 'role_id']),
     };
     const defaultBlocked = new Set(['password_hash', 'created_at', 'role_id', 'status']);
     const BLOCKED_FIELDS = TABLE_BLOCKED_FIELDS[table] || defaultBlocked;

@@ -649,6 +649,8 @@ CREATE TABLE IF NOT EXISTS withdrawal_requests (
   approved_at TIMESTAMP,
   verified_by INT,
   verified_at TIMESTAMP,
+  completed_by INT,
+  completed_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP
 );
