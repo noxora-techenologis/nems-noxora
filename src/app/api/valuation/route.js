@@ -58,6 +58,55 @@ export async function GET(request) {
   }
 }
 
+// PUT: Update valuation details (CEO/Admin only)
+export async function PUT(request) {
+  try {
+    const { user, error: authError } = await verifySession(request);
+    if (authError) return authError;
+    const roleErr = await requireRole(user, ['ceo', 'admin']);
+    if (roleErr) return roleErr;
+
+    const body = await request.json();
+    const { capital, notes } = body;
+
+    const valuationRows = await getTable('company_valuation');
+    const v = valuationRows[0];
+    if (!v || !v.valuation_id) {
+      return NextResponse.json({ error: 'لا توجد سجلات تقييم.' }, { status: 404 });
+    }
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (capital !== undefined) {
+      updates.push(`"capital" = $${idx++}`);
+      values.push(Number(capital));
+    }
+    if (notes !== undefined) {
+      updates.push(`"notes" = $${idx++}`);
+      values.push(notes);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'لا توجد بيانات للتحديث' }, { status: 400 });
+    }
+
+    updates.push(`"updated_at" = NOW()`);
+    values.push(v.valuation_id);
+
+    const result = await query(
+      `UPDATE "company_valuation" SET ${updates.join(', ')} WHERE "valuation_id" = $${idx} RETURNING *`,
+      values
+    );
+
+    return NextResponse.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('Valuation PUT Error:', err);
+    return NextResponse.json({ error: 'حدث خطأ في الخادم.' }, { status: 500 });
+  }
+}
+
 // POST: Distribute profits (30% to owners, 70% retained)
 export async function POST(request) {
   try {

@@ -24,7 +24,8 @@ export default function OwnerDashboard() {
       fetch('/api/data/votes', { headers: getAuthHeaders() }).then(r => r.json()),
       fetch('/api/data/vote_options', { headers: getAuthHeaders() }).then(r => r.json()),
       fetch('/api/data/share_transactions', { headers: getAuthHeaders() }).then(r => r.json()),
-    ]).then(([own, shr, dist, vts, vOpts, trans]) => {
+      fetch('/api/valuation', { headers: getAuthHeaders() }).then(r => r.json()),
+    ]).then(([own, shr, dist, vts, vOpts, trans, val]) => {
       setData({
         owners: own.data || [],
         shares: shr.data || [],
@@ -32,6 +33,7 @@ export default function OwnerDashboard() {
         votes: vts.data || [],
         voteOptions: vOpts.data || [],
         transactions: trans.data || [],
+        valuation: val || null,
       });
       setLoading(false);
     }).catch(err => { console.error('Owner dashboard fetch error:', err); setLoading(false); });
@@ -46,12 +48,14 @@ export default function OwnerDashboard() {
     </DashboardLayout>
   );
 
-  const { owners = [], shares = [], distributions = [], votes = [], voteOptions = [] } = data || {};
+  const { owners = [], shares = [], distributions = [], votes = [], voteOptions = [], valuation = null } = data || {};
 
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
   const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
+  const companyValue = valuation ? (Number(valuation.company_value) || 0) : 0;
+  const shareValue = totalShares > 0 ? companyValue / totalShares : 0;
   const totalDistributed = distributions.filter(d => d.payment_status === 'paid').reduce((s, d) => s + d.amount, 0);
   const activeVotes = votes.filter(v => v.status === 'active');
 
@@ -109,7 +113,7 @@ export default function OwnerDashboard() {
                     </div>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontSize: '24px', fontWeight: 800, color: COLORS[i % COLORS.length] }}>{sh.ownership_percentage}%</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة: {formatCurrency(sh.total_shares * sh.current_value)}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة: {formatCurrency(sh.total_shares * shareValue)}</div>
                     </div>
                   </div>
                   <div className="progress-bar">
@@ -154,6 +158,7 @@ export default function OwnerDashboard() {
                       id={`vote-now-${v.vote_id}`}
                       className="btn btn-primary btn-sm w-full"
                       style={{ marginTop: '10px' }}
+                      onClick={() => window.location.href = '/dashboard/owner/owners'}
                     >
                       🗳️ التصويت الآن
                     </button>

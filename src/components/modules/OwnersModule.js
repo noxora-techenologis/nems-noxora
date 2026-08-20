@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatCurrency as formatCurrencyImport, formatNumber } from '@/lib/format';
+import { formatCurrency as formatCurrencyImport, formatNumber, getPreferredCurrency } from '@/lib/format';
 import CandlestickChart from '@/components/CandlestickChart';
 import { getSession, getAuthHeaders } from '@/lib/auth';
 import UserProfileModal from '@/components/UserProfileModal';
@@ -289,45 +289,18 @@ export default function OwnersModule({ session }) {
       return;
     }
 
-    // Get owner shares weight
-    const ownerInfo = owners.find(o => o.user_id === session.user_id);
-    const ownerShares = shares.find(s => s.owner_id === ownerInfo?.owner_id);
-    const sharesWeight = ownerShares ? ownerShares.total_shares : 100; // fallback weight
-
     try {
-      // 1. Record user vote
-      const voteRes = await fetch('/api/data/user_votes', {
+      const voteRes = await fetch('/api/votes/cast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           vote_id: voteId,
-          user_id: session.user_id,
           option_id: optionId,
-          shares_weight: sharesWeight,
-          _userId: session.user_id,
         }),
       });
 
       const voteResult = await voteRes.json();
       if (voteResult.success) {
-        // Update vote_option counter locally (normally this would recalculate in backend, but we'll sync local state via DB update)
-        const optToUpdate = voteOptions.find(o => o.option_id === optionId);
-        if (optToUpdate && totalShares > 0) {
-          const prevWeightedVotes = (optToUpdate.weighted_percentage / 100) * totalShares;
-          const newWeightedVotes = prevWeightedVotes + sharesWeight;
-          const nextWeight = Math.min(100, Math.round((newWeightedVotes / totalShares) * 10000) / 100);
-          await fetch('/api/data/vote_options', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-            body: JSON.stringify({
-              _id: optionId,
-              _userId: session.user_id,
-              votes_count: optToUpdate.votes_count + 1,
-              weighted_percentage: isNaN(nextWeight) ? 0 : nextWeight,
-            }),
-          });
-        }
-
         alert('تم تسجيل صوتك ووزنك الاستثماري بنجاح!');
         fetchData();
       } else {
@@ -547,7 +520,33 @@ export default function OwnersModule({ session }) {
   }
 
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
-  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
+  const formatCurrency = (n) => formatCurrencyImport(n, getPreferredCurrency());
+
+  // Valuation edit handler
+  const handleSaveValuation = async () => {
+    if (!editAssets && editAssets !== '0') return;
+    try {
+      const res = await fetch('/api/valuation', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          capital: Number(editAssets),
+          notes: editNotes || '',
+          _userId: session.user_id,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('تم تحديث التقييم بنجاح!');
+        fetchData();
+      } else {
+        alert(result.error || 'فشلت عملية التحديث');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('تعذر الاتصال بالخادم');
+    }
+  };
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0) || 0;
   const capital = valuation ? Number(valuation.capital) || 0 : 0;
@@ -639,36 +638,54 @@ export default function OwnersModule({ session }) {
             margin: '16px 0', padding: '16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-accent)'
           }}>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال التأسيسي</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>
-                {formatCurrency(capital)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح المحتفظ بها (70%)</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-                {formatCurrency(retainedEarnings)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي قيمة الشركة</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>
-                {formatCurrency(companyValue)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم الحالية</div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>
-                {formatCurrency(shareValue)} / سهم
-              </div>
-            </div>
+            {isCEO ? (
+              <>
+                <div className="form-group">
+                  <label className="form-label">رأس المال التأسيسي ({getPreferredCurrency()})</label>
+                  <input type="number" className="form-input" value={editAssets} onChange={e => setEditAssets(e.target.value)} style={{ fontSize: '18px', fontWeight: 900 }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح المحتفظ بها (70%)</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>{formatCurrency(retainedEarnings)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي قيمة الشركة</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>{formatCurrency(companyValue)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم الحالية</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>{formatCurrency(shareValue)} / سهم</div>
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">ملاحظات</label>
+                  <input type="text" className="form-input" value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="ملاحظات التقييم..." />
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={handleSaveValuation} style={{ gridColumn: '1 / -1', alignSelf: 'flex-start' }}>💾 حفظ التعديلات</button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>رأس المال التأسيسي</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--info)', marginTop: '4px' }}>{formatCurrency(capital)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الأرباح المحتفظ بها (70%)</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>{formatCurrency(retainedEarnings)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي قيمة الشركة</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--noxora-yellow-light)', marginTop: '4px' }}>{formatCurrency(companyValue)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>قيمة السهم الحالية</div>
+                  <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--success)', marginTop: '4px' }}>{formatCurrency(shareValue)} / سهم</div>
+                </div>
+              </>
+            )}
             {pendingToOwners > 0 && (
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>أرباح للتوزيع (30%)</div>
-                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--warning)', marginTop: '4px' }}>
-                  {formatCurrency(pendingToOwners)}
-                </div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--warning)', marginTop: '4px' }}>{formatCurrency(pendingToOwners)}</div>
               </div>
             )}
           </div>
