@@ -683,8 +683,8 @@ export default function ProjectsModule({ session }) {
               )}
             </div>
 
-                              {/* Attached Media for Employees (Videos / Content to Publish) */}
-                              {t.attached_media && t.attached_media.url && (
+                              {/* Attached Media — only visible to managers or the assigned employee */}
+                              {(canManage || isAssignedToMe) && t.attached_media && t.attached_media.url && (
                                 <div style={{
                                   marginTop: '10px', padding: '12px',
                                   background: 'linear-gradient(135deg, rgba(192,57,43,0.12), rgba(243,156,18,0.08))',
@@ -723,7 +723,8 @@ export default function ProjectsModule({ session }) {
                                 </div>
                               )}
 
-                              {t.status === 'completed' && t.proof_submitted && (
+                              {/* Proof of completion — only visible to managers or the assigned employee */}
+                              {(canManage || isAssignedToMe) && t.status === 'completed' && t.proof_submitted && (
                                 <div style={{
                                   marginTop: '10px', padding: '10px',
                                   background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
