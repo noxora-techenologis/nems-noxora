@@ -102,19 +102,19 @@ export default function FMDashboard() {
       {companyBudget && (
         <div className="card mb-4">
           <div className="card-header">
-            <h2 className="card-title">📊 ميزانية الشركة {companyBudget.period}</h2>
+            <h2 className="card-title">📊 ميزانية الشركة {companyBudget.fiscal_year}</h2>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '16px' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)' }}>{formatCurrency(companyBudget.total_amount)}</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)' }}>{formatCurrency(companyBudget.allocated)}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>إجمالي الميزانية</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(companyBudget.spent_amount)}</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--danger)' }}>{formatCurrency(companyBudget.spent)}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>المنصرف</div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--success)' }}>{formatCurrency(companyBudget.remaining_amount)}</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--success)' }}>{formatCurrency(Math.max(0, companyBudget.allocated - companyBudget.spent))}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>المتبقي</div>
             </div>
           </div>
@@ -122,13 +122,13 @@ export default function FMDashboard() {
             <div
               className="progress-fill"
               style={{
-                width: `${Math.min(100, (companyBudget.spent_amount / companyBudget.total_amount) * 100)}%`,
-                background: companyBudget.spent_amount / companyBudget.total_amount > 0.8 ? 'var(--grad-red)' : 'linear-gradient(90deg, #27AE60, #2ECC71)'
+                width: `${Math.min(100, companyBudget.allocated > 0 ? (companyBudget.spent / companyBudget.allocated) * 100 : 0)}%`,
+                background: companyBudget.allocated > 0 && (companyBudget.spent / companyBudget.allocated) > 0.8 ? 'var(--grad-red)' : 'linear-gradient(90deg, #27AE60, #2ECC71)'
               }}
             />
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'left' }}>
-            {Math.round((companyBudget.spent_amount / companyBudget.total_amount) * 100)}% مُنصرف
+            {companyBudget.allocated > 0 ? Math.round((companyBudget.spent / companyBudget.allocated) * 100) : 0}% مُنصرف
           </div>
         </div>
       )}

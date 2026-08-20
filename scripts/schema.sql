@@ -253,6 +253,8 @@ CREATE TABLE IF NOT EXISTS expenses (
 
 CREATE TABLE IF NOT EXISTS budgets (
   budget_id SERIAL PRIMARY KEY,
+  name VARCHAR(200) DEFAULT 'ميزانية الشركة',
+  description TEXT,
   project_id INT REFERENCES projects(project_id),
   allocated DECIMAL(15,2),
   spent DECIMAL(15,2) DEFAULT 0,

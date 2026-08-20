@@ -188,6 +188,10 @@ export async function PUT(request, { params }) {
     // Allow 'status' for tasks (task lifecycle), block for other tables
     const TABLE_BLOCKED_FIELDS = {
       tasks: new Set(['password_hash', 'created_at', 'role_id']),
+      revenues: new Set(['password_hash', 'created_at', 'role_id']),
+      expenses: new Set(['password_hash', 'created_at', 'role_id']),
+      budgets: new Set(['password_hash', 'created_at', 'role_id']),
+      salaries: new Set(['password_hash', 'created_at', 'role_id']),
     };
     const defaultBlocked = new Set(['password_hash', 'created_at', 'role_id', 'status']);
     const BLOCKED_FIELDS = TABLE_BLOCKED_FIELDS[table] || defaultBlocked;
