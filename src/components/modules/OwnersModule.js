@@ -520,7 +520,7 @@ export default function OwnersModule({ session }) {
   }
 
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
-  const formatCurrency = (n) => formatCurrencyImport(n, getPreferredCurrency());
+  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   // Valuation edit handler
   const handleSaveValuation = async () => {

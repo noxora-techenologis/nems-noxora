@@ -51,7 +51,7 @@ export default function OwnerDashboard() {
   const { owners = [], shares = [], distributions = [], votes = [], voteOptions = [], valuation = null } = data || {};
 
   // Format using NEMS unified formatter (enforces Ghubariya numerals and MRU currency)
-  const formatCurrency = (n) => formatCurrencyImport(n, getPreferredCurrency());
+  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   const totalShares = shares.reduce((s, sh) => s + sh.total_shares, 0);
   const companyValue = valuation ? (Number(valuation.company_value) || 0) : 0;

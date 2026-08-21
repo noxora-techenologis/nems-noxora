@@ -232,7 +232,7 @@ export default function DebtsModule({ session }) {
     setDescription('');
   };
 
-  const formatCurrency = (n) => formatCurrencyImport(n, getPreferredCurrency());
+  const formatCurrency = (n) => formatCurrencyImport(n, 'MRU');
 
   const isOverdue = (d) => {
     if (!d.due_date || d.status === 'paid') return false;
